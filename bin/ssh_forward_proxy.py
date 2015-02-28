@@ -1,5 +1,6 @@
 import sys
 import os
+import socket
 import select
 import paramiko
 import threading
@@ -13,6 +14,7 @@ import logging
 import argparse
 
 SSH_PORT = 22
+logging.basicConfig(level=logging.DEBUG)
 
 def make_client(host, port, username):
     client = paramiko.SSHClient()
@@ -52,14 +54,36 @@ class FakeSocket:
         sys.stdout.close()
 
 class Pipe:
-    def run_command(self, client_channel, command):
-        client_channel.send('Hello %s!\n' % self.username)
-        client_channel.send('Command: %s\n' % command)
+    def __init__(self, client, remote):
+        self.client = client
+        self.remote = remote
 
-    def run(self, username, client_channel, command):
-        self.username = username
-        self.run_command(client_channel, command)
-        client_channel.close()
+    def run(self, command):
+        self.remote.exec_command(command)
+
+        size = 1024
+        while True:
+            r, w, x = select.select([self.client, self.remote], [], [])
+
+            if self.remote in r:
+                content = self.remote.recv(size)
+                if not content:
+                    logging.debug('Output stream closed')
+                    break
+                self.client.sendall(content)
+
+            if self.client in r:
+                content = self.client.recv(size)
+                if not content:
+                    logger.debug('Input stream closed')
+                    break
+                self.remote.sendall(content)
+
+        if self.remote.exit_status_ready():
+            status = self.remote.recv_exit_status()
+            self.client.send_exit_status(status)
+
+        self.client.close()
 
 class Proxy(paramiko.ServerInterface):
     timeout = 10
@@ -78,7 +102,8 @@ class Proxy(paramiko.ServerInterface):
         except queue.Empty:
             logging.error('Client passed no commands')
             sys.exit(1)
-        Pipe().run(self.username, channel, command)
+        Pipe(channel, remote).run(command)
+        self.transport.close()
 
     def check_channel_request(self, kind, chanid):
         return paramiko.OPEN_SUCCEEDED
@@ -98,7 +123,9 @@ if __name__ == '__main__':
     host = sys.argv[1]
     port = int(sys.argv[2])
     user = sys.argv[3]
-    remote = make_client(host, port, user)
+    remote_client = make_client(host, port, user)
+    remote_channel = remote_client.get_transport().open_session()
 
-    Proxy(remote)
+    Proxy(remote_channel)
+    remote_client.close()
 
