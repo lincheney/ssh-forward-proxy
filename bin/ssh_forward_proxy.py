@@ -13,7 +13,6 @@ except ImportError:
 import logging
 import argparse
 
-SSH_PORT = 22
 logging.basicConfig(level=logging.DEBUG)
 
 def make_client(host, port, username):
@@ -124,10 +123,12 @@ class Proxy(paramiko.ServerInterface):
         return True
 
 if __name__ == '__main__':
-    host = sys.argv[1]
-    port = int(sys.argv[2])
-    user = sys.argv[3]
-    remote_client = make_client(host, port, user)
+    SSH_PORT = 22
+    parser = argparse.ArgumentParser(description='Forward all SSH requests to remote but authenticating as the proxy')
+    parser.add_argument('host', nargs='?', default='', help='Remote host')
+    parser.add_argument('port', nargs='?', default=SSH_PORT, type=int, help='Remote port (default {})'.format(SSH_PORT))
+    parser.add_argument('username', nargs='?', help='Username')
+    remote_client = make_client(args.host, args.host, args.username)
     remote_channel = remote_client.get_transport().open_session()
 
     Proxy(remote_channel)
