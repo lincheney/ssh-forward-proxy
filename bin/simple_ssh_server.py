@@ -40,19 +40,30 @@ class Worker(threading.Thread):
         )
 
         size = 1024
-        endpoint = {process.stdout: channel.sendall, process.stderr: channel.sendall_stderr, channel: process.stdin.raw.write}
         data = True
         while data:
-            r, w, x = select.select(list(endpoint.keys()), [], [])
-            for stream in r:
-                if stream is channel:
-                    data = stream.recv(size)
-                else:
-                    data = stream.raw.read(size)
+            r, w, x = select.select([process.stdout, process.stderr, channel], [], [])
+
+            if process.stdout in r:
+                data = process.stdout.raw.read(size)
                 if not data:
-                    logging.info('No more data on %r', stream)
+                    logging.info('No more data on stdout')
                     break
-                endpoint[stream](data)
+                channel.sendall(data)
+
+            if process.stderr in r:
+                data = process.stderr.raw.read(size)
+                if not data:
+                    logging.info('No more data on stderr')
+                    break
+                channel.sendall_stderr(data)
+
+            if channel in r:
+                data = channel.recv(size)
+                if not data:
+                    logging.info('No more data on stdin')
+                    break
+                process.stdin.raw.write(data)
 
         channel.close()
 
