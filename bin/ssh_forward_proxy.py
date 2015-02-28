@@ -109,7 +109,9 @@ class Proxy(paramiko.ServerInterface):
         self.transport.close()
 
     def check_channel_request(self, kind, chanid):
-        return paramiko.OPEN_SUCCEEDED
+        if kind == 'session':
+            return paramiko.OPEN_SUCCEEDED
+        return paramiko.OPEN_FAILED_ADMINISTRATIVELY_PROHIBITED
 
     def check_auth_none(self, username):
         self.username = username
