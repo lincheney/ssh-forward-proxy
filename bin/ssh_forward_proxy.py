@@ -23,27 +23,27 @@ class Proxy(threading.Thread):
         self.server = server
         self.transport = self.server.transport
 
-    def serve(self, server_channel):
+    def _run(self, client_channel):
         username = self.server.user_queue.get()
-        server_channel.send('Hello %s!' % username)
+        client_channel.send('Hello %s!' % username)
 
         command = self.server.exec_queue.get()
-        server_channel.send('Command: %s' % command)
+        client_channel.send('Command: %s' % command)
 
     def run(self):
         try:
-            server_channel = self.transport.accept(20)
-            assert(server_channel is not None)
+            client_channel = self.transport.accept(20)
+            assert(client_channel is not None)
         except Exception as e:
-            logging.exception()
+            logging.exception('Failed to open channel to client')
             return
 
         try:
-            self.server(server_channel)
+            self._run(client_channel)
         except Exception as e:
-            logging.exception()
+            logging.exception('Error serving')
         finally:
-            server_channel.close()
+            client_channel.close()
 
 class ConnectionServer(paramiko.ServerInterface):
     host_key = paramiko.RSAKey(filename='server-key')
@@ -67,14 +67,15 @@ class ConnectionServer(paramiko.ServerInterface):
     def check_auth_publickey(self, username, key):
         self.user_queue.put(username)
         return paramiko.AUTH_SUCCESSFUL
+    def check_auth_none(self, username):
+        self.user_queue.put(username)
+        return paramiko.AUTH_SUCCESSFUL
     
     def get_allowed_auths(self, username):
         return 'password,publickey'
 
     def check_channel_shell_request(self, channel):
         return True
-    def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
-        return False
     def check_channel_exec_request(self, channel, command):
         self.exec_queue.put(command)
         return True
