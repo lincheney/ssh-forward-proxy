@@ -33,7 +33,7 @@ class Worker(threading.Thread):
 
         logging.info('Executing %r', command)
         process = subprocess.Popen(
-            shlex.split(command),
+            ['sh', '-c', command],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
