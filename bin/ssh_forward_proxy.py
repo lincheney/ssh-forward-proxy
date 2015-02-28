@@ -1,4 +1,5 @@
 import sys
+import os
 import select
 import socket
 import paramiko
@@ -17,10 +18,15 @@ SSH_PORT = 22
 class Proxy(threading.Thread):
     daemon = True
 
-    def __init__(self, queue, transport):
+    def __init__(self, server):
         threading.Thread.__init__(self)
-        self.transport = transport
-        self.queue = queue
+        self.server = server
+        self.transport = self.server.transport
+
+    def serve(self, server_channel):
+        username = self.server.user_queue.get()
+        server_channel.send('Hello %s!' % username)
+        server_channel.close()
 
     def run(self):
         try:
@@ -30,30 +36,34 @@ class Proxy(threading.Thread):
             logging.exception()
             return
 
-        server_channel.send('Hello!')
-
-        server_channel.close()
+        try:
+            self.server(server_channel)
+        except Exception as e:
+            logging.exception()
+        finally:
+            server_channel.close()
 
 class ConnectionServer(paramiko.ServerInterface):
     host_key = paramiko.RSAKey(filename='server-key')
 
     def __init__(self, conn, addr):
-        self.queue = queue.Queue()
+        self.exec_queue = queue.Queue()
+        self.user_queue = queue.Queue()
 
         self.transport = paramiko.Transport(conn)
         self.transport.add_server_key(self.host_key)
         self.transport.start_server(server=self)
 
-        self.thread = Proxy(self.queue, self.transport)
+        self.thread = Proxy(self)
         self.thread.start()
 
     def check_channel_request(self, kind, chanid):
         return paramiko.OPEN_SUCCEEDED
     def check_auth_password(self, username, password):
-        self.queue.put(('username', username))
+        self.user_queue.put(username)
         return paramiko.AUTH_SUCCESSFUL
     def check_auth_publickey(self, username, key):
-        self.queue.put(('username', username))
+        self.user_queue.put(username)
         return paramiko.AUTH_SUCCESSFUL
     
     def get_allowed_auths(self, username):
@@ -64,7 +74,7 @@ class ConnectionServer(paramiko.ServerInterface):
     def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
         return False
     def check_channel_exec_request(self, channel, command):
-        self.queue.put(('exec', command))
+        self.exec_queue.put(command)
         return True
     def check_channel_env_request(self, channel, name, value):
         return False
