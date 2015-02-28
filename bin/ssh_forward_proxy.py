@@ -66,16 +66,20 @@ class Pipe:
             r, w, x = select.select([self.client, self.remote], [], [])
 
             if self.remote in r:
-                content = self.remote.recv(size)
-                if not content:
-                    logging.debug('Output stream closed')
+                stdout = self.remote.recv(size)
+                if stdout:
+                    self.client.sendall(stdout)
+                stderr = self.remote.recv_stderr(size)
+                if stderr:
+                    self.client.sendall_stderr(stderr)
+                if not stdout and not stderr:
+                    logging.debug('Output streams closed')
                     break
-                self.client.sendall(content)
 
             if self.client in r:
                 content = self.client.recv(size)
                 if not content:
-                    logger.debug('Input stream closed')
+                    logging.debug('Input stream closed')
                     break
                 self.remote.sendall(content)
 
