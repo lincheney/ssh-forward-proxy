@@ -1,7 +1,7 @@
 import sys
 import os
 import select
-import socket
+import select
 import paramiko
 import threading
 
@@ -14,6 +14,34 @@ import logging
 import argparse
 
 SSH_PORT = 22
+
+class FakeSocket:
+    """
+    Fake socket to read from stdin and write to stdout
+    conforming to the interface specified at
+    http://docs.paramiko.org/en/1.15/api/transport.html
+    """
+
+    timeout = None
+    def settimeout(self, timeout):
+        self.timeout = timeout
+
+    def send(self, string):
+        if sys.stdout.closed:
+            return 0
+        return os.write(sys.stdout.fileno(), string)
+
+    def recv(self, count):
+        if sys.stdin.closed:
+            return ''
+        r, w, x = select.select([sys.stdin], [], [], self.timeout)
+        if sys.stdin in r:
+            return os.read(sys.stdin.fileno(), count)
+        raise socket.timeout()
+
+    def close(self):
+        sys.stdin.close()
+        sys.stdout.close()
 
 class Proxy(threading.Thread):
     daemon = True
