@@ -112,5 +112,11 @@ def make_server(host, port):
         sys.exit(0)
 
 if __name__ == '__main__':
-    make_server('', 22)
+    SSH_PORT = 22
+    parser = argparse.ArgumentParser(description='Launch a really simple SSH server')
+    parser.add_argument('port', nargs='?', default=SSH_PORT, type=int, help='Port (default {})'.format(SSH_PORT))
+    parser.add_argument('host', nargs='?', default='', help='Host')
+    args = parser.parse_args()
+
+    make_server(args.host, args.port)
 
