@@ -49,10 +49,10 @@ class Worker(threading.Thread):
                     data = stream.recv(size)
                 else:
                     data = stream.raw.read(size)
-                endpoint[stream](data)
                 if not data:
                     logging.info('No more data on %r', stream)
                     break
+                endpoint[stream](data)
 
         channel.close()
 
