@@ -40,8 +40,7 @@ class Worker(threading.Thread):
         )
 
         size = 1024
-        data = True
-        while data:
+        while True:
             r, w, x = select.select([process.stdout, process.stderr, channel], [], [])
 
             if process.stdout in r:
@@ -65,9 +64,11 @@ class Worker(threading.Thread):
                     break
                 process.stdin.raw.write(data)
 
+        if process.poll():
+            channel.send_exit_status(process.returncode)
         channel.close()
 
-class Server(paramiko.ServerInterface):
+class Connection(paramiko.ServerInterface):
     host_key = paramiko.RSAKey(filename='server-key')
 
     def __init__(self, client):
@@ -105,20 +106,17 @@ def make_server(host, port):
     logging.debug('listen()')
     sock.listen(100)
 
-    servers = []
+    connections = []
 
     try:
         while True:
-            #logging.debug('Waiting for connection...')
-            r, w, x = select.select([sock], [], [], 1)
-            if sock in r:
-                logging.debug('accept()')
-                client, address = sock.accept()
-                logging.info('Got a connection!')
-                servers.append(Server(client))
+            logging.debug('accept()')
+            client, address = sock.accept()
+            logging.info('Got a connection!')
+            connections.append(Connection(client))
     except KeyboardInterrupt:
-        for s in servers:
-            s.join(1)
+        for conn in connections:
+            conn.join(1)
         sock.close()
         sys.exit(0)
 
