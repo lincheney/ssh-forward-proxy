@@ -26,7 +26,9 @@ class Proxy(threading.Thread):
     def serve(self, server_channel):
         username = self.server.user_queue.get()
         server_channel.send('Hello %s!' % username)
-        server_channel.close()
+
+        command = self.server.exec_queue.get()
+        server_channel.send('Command: %s' % command)
 
     def run(self):
         try:
