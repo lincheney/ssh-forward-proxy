@@ -14,6 +14,15 @@ import argparse
 
 SSH_PORT = 22
 
+def make_client(host, port, username):
+    client = paramiko.SSHClient()
+    client.load_system_host_keys()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    logging.info('Connecting to ssh host %s@%s:%d ...', username, host, port)
+    client.connect(host, port, username=username)
+    return client
+
 class FakeSocket:
     """
     Fake socket to read from stdin and write to stdout
@@ -56,7 +65,7 @@ class Proxy(paramiko.ServerInterface):
     timeout = 10
     host_key = paramiko.RSAKey(filename='server-key')
 
-    def __init__(self):
+    def __init__(self, remote):
         self.username = None
         self.queue = queue.Queue()
 
@@ -86,5 +95,10 @@ class Proxy(paramiko.ServerInterface):
         return True
 
 if __name__ == '__main__':
-    Proxy()
+    host = sys.argv[1]
+    port = int(sys.argv[2])
+    user = sys.argv[3]
+    remote = make_client(host, port, user)
+
+    Proxy(remote)
 
