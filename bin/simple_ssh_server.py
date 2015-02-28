@@ -3,6 +3,8 @@ import os
 import select
 import socket
 import paramiko
+import shlex
+import subprocess
 import threading
 
 try:
@@ -15,6 +17,45 @@ import argparse
 
 logging.basicConfig(level=logging.DEBUG)
 
+class Worker(threading.Thread):
+    timeout = 10
+    daemon = True
+    def __init__(self, queue):
+        threading.Thread.__init__(self)
+        self.queue = queue
+
+    def run(self):
+        try:
+            channel, command = self.queue.get(self.timeout)
+        except queue.Empty:
+            logging.error('Client passed no commands')
+            return
+
+        logging.info('Executing %r', command)
+        process = subprocess.Popen(
+            shlex.split(command),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        size = 1024
+        endpoint = {process.stdout: channel.sendall, process.stderr: channel.sendall_stderr, channel: process.stdin.raw.write}
+        data = True
+        while data:
+            r, w, x = select.select(list(endpoint.keys()), [], [])
+            for stream in r:
+                if stream is channel:
+                    data = stream.recv(size)
+                else:
+                    data = stream.raw.read(size)
+                endpoint[stream](data)
+                if not data:
+                    logging.info('No more data on %r', stream)
+                    break
+
+        channel.close()
+
 class Server(paramiko.ServerInterface):
     host_key = paramiko.RSAKey(filename='server-key')
 
@@ -25,9 +66,11 @@ class Server(paramiko.ServerInterface):
         self.transport.add_server_key(self.host_key)
         self.transport.start_server(server=self)
 
-        channel, command = self.queue.get()
-        channel.send('Command: %s\n' % command)
-        channel.close()
+        self.worker = Worker(self.queue)
+        self.worker.start()
+
+    def join(self, timeout):
+        return self.worker.join(timeout)
 
     def check_channel_request(self, kind, chanid):
         return paramiko.OPEN_SUCCEEDED
@@ -51,16 +94,20 @@ def make_server(host, port):
     logging.debug('listen()')
     sock.listen(100)
 
+    servers = []
+
     try:
         while True:
-            logging.info('Waiting for connection...')
+            #logging.debug('Waiting for connection...')
             r, w, x = select.select([sock], [], [], 1)
             if sock in r:
                 logging.debug('accept()')
                 client, address = sock.accept()
                 logging.info('Got a connection!')
-                Server(client)
+                servers.append(Server(client))
     except KeyboardInterrupt:
+        for s in servers:
+            s.join(1)
         sock.close()
         sys.exit(0)
 
