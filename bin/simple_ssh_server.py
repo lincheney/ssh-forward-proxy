@@ -82,7 +82,8 @@ class Connection(paramiko.ServerInterface):
         self.worker.start()
 
     def join(self, timeout):
-        return self.worker.join(timeout)
+        self.worker.join(timeout)
+        return self.worker.isAlive()
 
     def check_channel_request(self, kind, chanid):
         if kind == 'session':
@@ -112,6 +113,9 @@ def make_server(host, port):
 
     try:
         while True:
+            # clean up closed connections
+            connections = [conn for conn in connections if not conn.join(0)]
+
             logging.debug('accept()')
             client, address = sock.accept()
             logging.info('Got a connection!')
