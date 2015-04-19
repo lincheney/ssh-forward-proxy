@@ -154,7 +154,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Forward all SSH requests to remote but authenticating as the proxy')
     parser.add_argument('remote', help='Remote host ([USER@]HOST:[PORT]). Default port is same as port argument.')
     parser.add_argument('port', nargs='?', default=SSH_PORT, type=int, help='Port (default {})'.format(SSH_PORT))
-    parser.add_argument('host', nargs='?', default='', help='Host')
+    parser.add_argument('host', nargs='?', default='', help='Bind host')
     parser.add_argument('-i', dest='identity_file', help='Path to identity file (same as ssh -i)')
 
     args = parser.parse_args()
