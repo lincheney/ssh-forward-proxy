@@ -7,6 +7,7 @@ COPY requirements.txt /usr/src/app/
 RUN pip install -r requirements.txt
 
 COPY . /usr/src/app
+ENV PYTHONPATH=/usr/src/app/
 
-ENTRYPOINT ["python3", "bin/ssh_forward_proxy.py"]
+ENTRYPOINT ["python", "bin/ssh-forward-proxy.py"]
 
