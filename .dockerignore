@@ -3,3 +3,4 @@
 *.pyc
 *.egg
 tests
+*.egg-info
