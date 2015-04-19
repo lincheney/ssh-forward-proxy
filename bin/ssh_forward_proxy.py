@@ -16,7 +16,7 @@ import argparse
 logging.basicConfig(level=logging.INFO)
 
 def parse_host_string(host):
-    user, _, host = host.partition('@')
+    user, _, host = host.rpartition('@')
     host, _, port = host.partition(':')
     port = (port and int(port))
     return user, host, port
@@ -127,6 +127,7 @@ def run_server(host, port, args):
             threads = [t for t in threads if not t.isAlive()]
 
             logging.debug('accept()')
+            logging.info('Server started')
             client, address = sock.accept()
             logging.info('Got a connection!')
 
