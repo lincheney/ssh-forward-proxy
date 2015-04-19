@@ -183,3 +183,13 @@ class IOTest(unittest.TestCase):
         result = self.client.stderr.getvalue()
         expected = self.read_file('stderr.txt')
         self.assertEqual(result, expected)
+
+    def test_channels_closed(self):
+        """
+        all channels are closed after the session is over
+        """
+
+        self.queue().put((self.client, sentinel.command))
+        proxy = Proxy(sentinel.socket, mock.Mock())
+        self.client.close.assert_called_once_with()
+        self.remote().close.assert_called_once_with()
