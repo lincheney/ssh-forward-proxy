@@ -115,7 +115,14 @@ def make_server(host, port):
             logging.debug('accept()')
             client, address = sock.accept()
             logging.info('Got a connection!')
-            connections.append(Connection(client))
+
+            try:
+                conn = Connection(client)
+            except EOFError:
+                logging.info('EOF on connection')
+                continue
+
+            connections.append(conn)
     except KeyboardInterrupt:
         for conn in connections:
             conn.join(1)
