@@ -144,7 +144,7 @@ class IOTest(unittest.TestCase):
 
         self.queue().put((self.client, sentinel.command))
         try:
-            proxy = Proxy(sentinel.socket, mock.Mock())
+            proxy = Proxy(sentinel.socket, 'host', 1234)
         except self.Error:
             pass
         self.remote_channel.exec_command.assert_called_once_with(sentinel.command)
@@ -155,7 +155,7 @@ class IOTest(unittest.TestCase):
         """
 
         self.queue().put((self.client, sentinel.command))
-        proxy = Proxy(sentinel.socket, mock.Mock())
+        proxy = Proxy(sentinel.socket, 'host', 1234)
 
         result = self.remote_channel.stdout.getvalue()
         expected = self.read_file('stdin.txt')
@@ -167,7 +167,7 @@ class IOTest(unittest.TestCase):
         """
 
         self.queue().put((self.client, sentinel.command))
-        proxy = Proxy(sentinel.socket, mock.Mock())
+        proxy = Proxy(sentinel.socket, 'host', 1234)
 
         result = self.client.stdout.getvalue()
         expected = self.read_file('stdout.txt')
@@ -179,7 +179,7 @@ class IOTest(unittest.TestCase):
         """
 
         self.queue().put((self.client, sentinel.command))
-        proxy = Proxy(sentinel.socket, mock.Mock())
+        proxy = Proxy(sentinel.socket, 'host', 1234)
 
         result = self.client.stderr.getvalue()
         expected = self.read_file('stderr.txt')
@@ -191,6 +191,6 @@ class IOTest(unittest.TestCase):
         """
 
         self.queue().put((self.client, sentinel.command))
-        proxy = Proxy(sentinel.socket, mock.Mock())
+        proxy = Proxy(sentinel.socket, 'host', 1234)
         self.client.close.assert_called_once_with()
         self.remote().close.assert_called_once_with()

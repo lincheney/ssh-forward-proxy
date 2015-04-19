@@ -29,8 +29,8 @@ class Proxy(paramiko.ServerInterface):
     timeout = 10
     host_key = paramiko.RSAKey(filename='server-key')
 
-    def __init__(self, socket, args):
-        self.username = None
+    def __init__(self, socket, remote_host, remote_port, username=None, **kwargs):
+        self.username = username
         self.queue = queue.Queue()
 
         self.transport = paramiko.Transport(socket)
@@ -50,10 +50,10 @@ class Proxy(paramiko.ServerInterface):
         self.remote = None
         try:
             self.remote = self.connect_to_remote(
-                args.remote,
-                args.remote_port,
-                args.username or self.username,
-                key_filename=args.identity_file,
+                remote_host,
+                remote_port,
+                username or self.username,
+                **kwargs
             )
             remote = self.remote.get_transport().open_session()
             remote.exec_command(command)
@@ -115,7 +115,7 @@ class Proxy(paramiko.ServerInterface):
         self.queue.put((channel, command))
         return True
 
-def run_server(host, port, args):
+def run_server(host, port, **kwargs):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     logging.debug('bind()')
@@ -135,7 +135,7 @@ def run_server(host, port, args):
             client, address = sock.accept()
             logging.info('Got a connection!')
 
-            thread = threading.Thread(target=Proxy, args=(client, args))
+            thread = threading.Thread(target=Proxy, args=(client,), kwargs=kwargs)
             thread.daemon = True
             threads.append(thread)
             thread.start()

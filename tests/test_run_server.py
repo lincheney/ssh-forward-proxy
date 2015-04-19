@@ -28,7 +28,7 @@ class RunServerTest(unittest.TestCase):
         # raise an error to stop the server going into the accept loop
         with patch('socket.socket.accept', side_effect=self.Error() ):
             try:
-                run_server('host', 1234, None)
+                run_server('host', 1234)
             except self.Error:
                 pass
             bind.assert_called_once_with(('host', 1234))
@@ -46,8 +46,8 @@ class RunServerTest(unittest.TestCase):
         thread.start = mock.Mock(side_effect=self.Error() )
 
         try:
-            run_server('host', 1234, sentinel.args)
+            run_server('host', 1234, key='value')
         except self.Error:
             pass
-        Thread.assert_called_once_with(target=Proxy, args=(sentinel.socket, sentinel.args))
+        Thread.assert_called_once_with(target=Proxy, args=(sentinel.socket,), kwargs=dict(key='value') )
         thread.start.assert_called_once_with()

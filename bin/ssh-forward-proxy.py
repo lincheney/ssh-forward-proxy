@@ -14,7 +14,12 @@ if __name__ == '__main__':
     parser.add_argument('-i', dest='identity_file', help='Path to identity file (same as ssh -i)')
 
     args = parser.parse_args()
-    args.username, args.remote, args.remote_port = ssh_forward_proxy.parse_host_string(args.remote)
-    args.remote_port = (args.remote_port or args.port)
+    username, remote_host, remote_port = ssh_forward_proxy.parse_host_string(args.remote)
 
-    ssh_forward_proxy.run_server(args.host, args.port, args)
+    ssh_forward_proxy.run_server(
+        args.host, args.port,
+        remote_host=remote_host,
+        remote_port=(remote_port or args.port),
+        username=username,
+        key_filename=args.identity_file,
+    )
