@@ -1,2 +1,2 @@
 #!/bin/sh
-exec ssh -o PreferredAuthentications=keyboard-interactive,password -o PubkeyAuthentication=no "$@"
+exec ssh -o StrictHostKeyChecking=no -o PubkeyAuthentication=no "$@"
