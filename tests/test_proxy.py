@@ -2,10 +2,16 @@ import unittest
 from unittest import mock
 from unittest.mock import patch, sentinel
 
+import os
+import sys
 try:
     import queue
 except ImportError:
     import Queue as queue
+if sys.version_info[0] < 3:
+    from StringIO import StringIO
+else:
+    from io import StringIO
 
 from bin.ssh_forward_proxy import Proxy
 
@@ -75,3 +81,105 @@ class RemoteConnectionTest(unittest.TestCase):
     def test_client_is_returned(self, client):
         result = Proxy.connect_to_remote('abcdef', 12345, 'user')
         self.assertIs(result, client.return_value)
+
+class IOTest(unittest.TestCase):
+
+    class Error(Exception):
+        pass
+
+    @staticmethod
+    def open_file(file):
+        return open(os.path.join(os.path.dirname(__file__), file))
+    @staticmethod
+    def read_file(file):
+        with IOTest.open_file(file) as f:
+            return f.read()
+
+    @staticmethod
+    def FakeSocket(file):
+        m = mock.Mock()
+        m.input = IOTest.open_file(file)
+        m.stdout = StringIO()
+        m.stderr = StringIO()
+        m.fileno = m.input.fileno
+        m.recv = m.input.read
+        m.sendall = m.stdout.write
+        m.sendall_stderr = m.stderr.write
+        return m
+
+    @staticmethod
+    def FakeOutputSocket():
+        m = IOTest.FakeSocket('stdout.txt')
+        m.input2 = IOTest.open_file('stderr.txt')
+        m.recv_stderr = m.input2.read
+        return m
+
+    def setUp(self):
+        self.remote_channel = self.FakeOutputSocket()
+        self.client = self.FakeSocket('stdin.txt')
+
+        self.patches = []
+        self.patches.append( patch.object(Proxy, 'connect_to_remote') )
+        self.patches.append( patch.object(queue, 'Queue', return_value=queue.Queue()) )
+        self.patches.append( patch('paramiko.Transport') )
+
+        self.patched = [p.start() for p in self.patches]
+        self.remote = self.patched[0]
+        self.queue = self.patched[1]
+
+        self.remote().get_transport().open_session.return_value = self.remote_channel
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.remote_channel.input.close()
+        self.remote_channel.input2.close()
+        self.client.input.close()
+
+    def test_exec_command_on_remote(self):
+        """
+        command should be executed on remote
+        """
+
+        self.queue().put((self.client, sentinel.command))
+        try:
+            proxy = Proxy(sentinel.socket, mock.Mock())
+        except self.Error:
+            pass
+        self.remote_channel.exec_command.assert_called_once_with(sentinel.command)
+
+    def test_stdin_copied_to_remote(self):
+        """
+        client stdin should be copied to remote's stdin
+        """
+
+        self.queue().put((self.client, sentinel.command))
+        proxy = Proxy(sentinel.socket, mock.Mock())
+
+        result = self.remote_channel.stdout.getvalue()
+        expected = self.read_file('stdin.txt')
+        self.assertEqual(result, expected)
+
+    def test_stdout_copied_to_client(self):
+        """
+        remote stdout should be copied to client stdout
+        """
+
+        self.queue().put((self.client, sentinel.command))
+        proxy = Proxy(sentinel.socket, mock.Mock())
+
+        result = self.client.stdout.getvalue()
+        expected = self.read_file('stdout.txt')
+        self.assertEqual(result, expected)
+
+    def test_stderr_copied_to_client(self):
+        """
+        remote stderr should be copied to client stderr
+        """
+
+        self.queue().put((self.client, sentinel.command))
+        proxy = Proxy(sentinel.socket, mock.Mock())
+
+        result = self.client.stderr.getvalue()
+        expected = self.read_file('stderr.txt')
+        self.assertEqual(result, expected)
