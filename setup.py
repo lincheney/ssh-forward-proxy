@@ -13,10 +13,10 @@ setup(
     url = 'https://github.com/lincheney/ssh-forward-proxy',
     author = 'Cheney Lin',
     author_email = 'lincheney@gmail.com',
-    #packages = ['ssh_forward_proxy'],
-    scripts = ['bin/ssh_forward_proxy.py'],
+    packages = ['ssh_forward_proxy'],
+    scripts = ['bin/ssh-forward-proxy.py'],
     install_requires = ['paramiko'],
 
     tests_require = tests_require,
-    test_suite="tests",
+    test_suite = "tests",
 )

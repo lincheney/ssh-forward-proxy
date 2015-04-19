@@ -11,9 +11,6 @@ except ImportError:
     import Queue as queue
 
 import logging
-import argparse
-
-logging.basicConfig(level=logging.INFO)
 
 #   splits the string @host into into its components
 #   given it's in the format user@host:port (where user and port components are optional)
@@ -148,17 +145,3 @@ def run_server(host, port, args):
     finally:
         sock.close()
         sys.exit(0)
-
-if __name__ == '__main__':
-    SSH_PORT = 22
-    parser = argparse.ArgumentParser(description='Forward all SSH requests to remote but authenticating as the proxy')
-    parser.add_argument('remote', help='Remote host ([USER@]HOST:[PORT]). Default port is same as port argument.')
-    parser.add_argument('port', nargs='?', default=SSH_PORT, type=int, help='Port (default {})'.format(SSH_PORT))
-    parser.add_argument('host', nargs='?', default='', help='Bind host')
-    parser.add_argument('-i', dest='identity_file', help='Path to identity file (same as ssh -i)')
-
-    args = parser.parse_args()
-    args.username, args.remote, args.remote_port = parse_host_string(args.remote)
-    args.remote_port = (args.remote_port or args.port)
-
-    run_server(args.host, args.port, args)

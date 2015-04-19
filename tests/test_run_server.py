@@ -1,8 +1,12 @@
 import unittest
-from unittest import mock
-from unittest.mock import patch, sentinel
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+patch = mock.patch
+sentinel = mock.sentinel
 
-from bin.ssh_forward_proxy import run_server, Proxy
+from ssh_forward_proxy import run_server, Proxy
 
 class RunServerTest(unittest.TestCase):
 

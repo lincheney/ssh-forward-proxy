@@ -49,11 +49,11 @@ class BitBucketTest(unittest.TestCase):
         PORT = '4000'
         self.env['GIT_SSH'] = os.path.join(self.ROOT_DIR, 'tests', 'git_ssh_proxy.sh')
         # run the proxy
-        proxy_cmd = os.path.join(self.ROOT_DIR, 'bin', 'ssh_forward_proxy.py')
+        proxy_cmd = os.path.join(self.ROOT_DIR, 'bin', 'ssh-forward-proxy.py')
         proxy = subprocess.Popen([sys.executable, proxy_cmd, self.REPO_HOST, PORT, '-i', self.SSH_KEY])
         # wait a second
-        with self.assertRaises(subprocess.TimeoutExpired):
-            self.assertIsNone( proxy.wait(1) )
+        time.sleep(1)
+        self.assertIsNone( proxy.poll() )
 
         try:
             # clone

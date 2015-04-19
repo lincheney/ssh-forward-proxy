@@ -1,6 +1,10 @@
 import unittest
-from unittest import mock
-from unittest.mock import patch, sentinel
+try:
+    from unittest import mock
+except ImportError:
+    import mock
+patch = mock.patch
+sentinel = mock.sentinel
 
 import os
 import sys
@@ -8,12 +12,12 @@ try:
     import queue
 except ImportError:
     import Queue as queue
-if sys.version_info[0] < 3:
-    from StringIO import StringIO
-else:
+try:
     from io import StringIO
+except ImportError:
+    from StringIO import StringIO
 
-from bin.ssh_forward_proxy import Proxy
+from ssh_forward_proxy import Proxy
 
 class WithSimpleProxy:
     """
@@ -21,7 +25,7 @@ class WithSimpleProxy:
     """
 
     def setUp(self):
-        self.proxy_patch = patch('bin.ssh_forward_proxy.Proxy.__init__', return_value=None)
+        self.proxy_patch = patch.object(Proxy, '__init__', return_value=None)
         self.proxy_patch.start()
     def tearDown(self):
         self.proxy_patch.stop()

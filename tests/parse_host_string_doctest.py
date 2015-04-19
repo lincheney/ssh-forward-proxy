@@ -26,4 +26,4 @@ With both user and port
     ('user', 'host', 1234)
 """
 
-from bin.ssh_forward_proxy import parse_host_string
+from ssh_forward_proxy import parse_host_string
