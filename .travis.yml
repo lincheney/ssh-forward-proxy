@@ -8,6 +8,6 @@ install:
   - "pip install coveralls"
   - "pip install -r requirements.txt"
 script:
-  coverage run --source=ssh_foward_proxy setup.py test
+  coverage run --source=ssh_forward_proxy setup.py test
 after_success:
   coveralls
