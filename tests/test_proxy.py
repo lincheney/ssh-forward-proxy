@@ -8,14 +8,11 @@ sentinel = mock.sentinel
 
 import os
 import sys
+from io import BytesIO
 try:
     import queue
 except ImportError:
     import Queue as queue
-try:
-    from io import StringIO
-except ImportError:
-    from StringIO import StringIO
 
 from ssh_forward_proxy import Proxy
 
@@ -93,7 +90,7 @@ class IOTest(unittest.TestCase):
 
     @staticmethod
     def open_file(file):
-        return open(os.path.join(os.path.dirname(__file__), file))
+        return open(os.path.join(os.path.dirname(__file__), file), 'rb')
     @staticmethod
     def read_file(file):
         with IOTest.open_file(file) as f:
@@ -103,8 +100,8 @@ class IOTest(unittest.TestCase):
     def FakeSocket(file):
         m = mock.Mock()
         m.input = IOTest.open_file(file)
-        m.stdout = StringIO()
-        m.stderr = StringIO()
+        m.stdout = BytesIO()
+        m.stderr = BytesIO()
         m.fileno = m.input.fileno
         m.recv = m.input.read
         m.sendall = m.stdout.write

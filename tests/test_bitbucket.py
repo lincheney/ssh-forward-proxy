@@ -48,9 +48,10 @@ class BitBucketTest(unittest.TestCase):
     def test_repo_accessible_through_proxy(self):
         PORT = '4000'
         self.env['GIT_SSH'] = os.path.join(self.ROOT_DIR, 'tests', 'git_ssh_proxy.sh')
+        self.env['PYTHONPATH'] = self.ROOT_DIR
         # run the proxy
         proxy_cmd = os.path.join(self.ROOT_DIR, 'bin', 'ssh-forward-proxy.py')
-        proxy = subprocess.Popen([sys.executable, proxy_cmd, self.REPO_HOST, PORT, '-i', self.SSH_KEY])
+        proxy = subprocess.Popen([sys.executable, proxy_cmd, self.REPO_HOST, PORT, '-i', self.SSH_KEY], env=self.env)
         # wait a second
         time.sleep(1)
         self.assertIsNone( proxy.poll() )
