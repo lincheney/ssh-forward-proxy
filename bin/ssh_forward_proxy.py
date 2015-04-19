@@ -15,11 +15,18 @@ import argparse
 
 logging.basicConfig(level=logging.INFO)
 
+#   splits the string @host into into its components
+#   given it's in the format user@host:port (where user and port components are optional)
+#   port is converted to an integer or None
 def parse_host_string(host):
     user, _, host = host.rpartition('@')
-    host, _, port = host.partition(':')
-    port = (port and int(port))
-    return user, host, port
+    host2, _, port = host.partition(':')
+    if port.isdigit():
+        port = int(port)
+        host = host2
+    else:
+        port = None
+    return (user or None), host, port
 
 class Proxy(paramiko.ServerInterface):
     timeout = 10
