@@ -3,7 +3,7 @@
 This is a real life test of the proxy's capabilities.
 
 There is a private repository at https://bitbucket.org/lincheney/ssh-forward-proxy-test
-which has an associated read-only SSH key which is stored in ssh-forward-proxy-test-key
+which has an associated read-only SSH key which is stored in tests/ssh-forward-proxy-test-key
 
 We will provide the private key to the proxy and attempt to git clone the repo
 by modifying GIT_SSH to point to the proxy.
@@ -22,7 +22,7 @@ class BitBucketTest(unittest.TestCase):
 
     ROOT_DIR = os.path.abspath(os.path.join(__file__, '..', '..'))
     REPO_DIR = os.path.join(ROOT_DIR, 'tests', 'test-git-repo')
-    SSH_KEY = os.path.join(ROOT_DIR, 'ssh-forward-proxy-test-key')
+    SSH_KEY = os.path.join(ROOT_DIR, 'tests', 'ssh-forward-proxy-test-key')
 
     REPO_HOST = 'git@bitbucket.org:22'
     REPO_URL = 'git@bitbucket.org:lincheney/ssh-forward-proxy-test.git'
