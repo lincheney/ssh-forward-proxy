@@ -45,7 +45,12 @@ class Proxy(paramiko.ServerInterface):
 
         self.remote = None
         try:
-            self.remote = self.connect_to_remote(args.remote, args.remote_port, args.username or self.username)
+            self.remote = self.connect_to_remote(
+                args.remote,
+                args.remote_port,
+                args.username or self.username,
+                key_filename=args.identity_file,
+            )
             remote = self.remote.get_transport().open_session()
             remote.exec_command(command)
 
@@ -80,14 +85,14 @@ class Proxy(paramiko.ServerInterface):
                 self.remote.close()
             self.transport.close()
 
-    @classmethod
-    def connect_to_remote(cls, host, port, username):
+    @staticmethod
+    def connect_to_remote(host, port, username, **kwargs):
         client = paramiko.SSHClient()
         client.load_system_host_keys()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         logging.info('Connecting to ssh host %s@%s:%s ...', username, host, port)
-        client.connect(host, port, username=username)
+        client.connect(host, port, username=username, **kwargs)
         return client
 
     def check_channel_request(self, kind, chanid):
@@ -140,6 +145,7 @@ if __name__ == '__main__':
     parser.add_argument('remote', help='Remote host ([USER@]HOST:[PORT]). Default port is same as port argument.')
     parser.add_argument('port', nargs='?', default=SSH_PORT, type=int, help='Port (default {})'.format(SSH_PORT))
     parser.add_argument('host', nargs='?', default='', help='Host')
+    parser.add_argument('-i', dest='identity_file', help='Path to identity file (same as ssh -i)')
 
     args = parser.parse_args()
     args.username, args.remote, args.remote_port = parse_host_string(args.remote)
