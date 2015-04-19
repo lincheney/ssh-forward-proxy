@@ -31,18 +31,19 @@ class RunServerTest(unittest.TestCase):
 
     @patch('socket.socket.bind')
     @patch('socket.socket.accept', return_value=(sentinel.socket, sentinel.address))
-    def test_proxy_thread(self, accept, bind):
+    @patch('threading.Thread')
+    def test_proxy_thread(self, Thread, accept, bind):
         """
         the server should start a thread for the proxy on accept()
         """
 
-        thread = mock.Mock()
         # raise an error to stop the server going into the accept loop
-        with patch('threading.Thread', return_value=thread) as Thread:
-            thread.start = mock.Mock(side_effect=self.Error() )
-            try:
-                run_server('host', 1234, sentinel.args)
-            except self.Error:
-                pass
-            Thread.assert_called_once_with(target=Proxy, args=(sentinel.socket, sentinel.args))
-            thread.start.assert_called_once()
+        thread = Thread.return_value
+        thread.start = mock.Mock(side_effect=self.Error() )
+
+        try:
+            run_server('host', 1234, sentinel.args)
+        except self.Error:
+            pass
+        Thread.assert_called_once_with(target=Proxy, args=(sentinel.socket, sentinel.args))
+        thread.start.assert_called_once_with()
