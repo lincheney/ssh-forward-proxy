@@ -144,6 +144,8 @@ def run_server(host, port, args):
             thread.start()
     except KeyboardInterrupt:
         # stop server on ctrl+c
+        pass
+    finally:
         sock.close()
         sys.exit(0)
 
