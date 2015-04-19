@@ -129,6 +129,7 @@ class IOTest(unittest.TestCase):
         self.queue = self.patched[1]
 
         self.remote().get_transport().open_session.return_value = self.remote_channel
+        self.queue().put((self.client, sentinel.command))
 
     def tearDown(self):
         for p in self.patches:
@@ -137,14 +138,16 @@ class IOTest(unittest.TestCase):
         self.remote_channel.input2.close()
         self.client.input.close()
 
+    def make_proxy(self):
+        return Proxy(sentinel.socket, 'host', 1234)
+
     def test_exec_command_on_remote(self):
         """
         command should be executed on remote
         """
 
-        self.queue().put((self.client, sentinel.command))
         try:
-            proxy = Proxy(sentinel.socket, 'host', 1234)
+            self.make_proxy()
         except self.Error:
             pass
         self.remote_channel.exec_command.assert_called_once_with(sentinel.command)
@@ -154,9 +157,7 @@ class IOTest(unittest.TestCase):
         client stdin should be copied to remote's stdin
         """
 
-        self.queue().put((self.client, sentinel.command))
-        proxy = Proxy(sentinel.socket, 'host', 1234)
-
+        self.make_proxy()
         result = self.remote_channel.stdout.getvalue()
         expected = self.read_file('stdin.txt')
         self.assertEqual(result, expected)
@@ -166,9 +167,7 @@ class IOTest(unittest.TestCase):
         remote stdout should be copied to client stdout
         """
 
-        self.queue().put((self.client, sentinel.command))
-        proxy = Proxy(sentinel.socket, 'host', 1234)
-
+        self.make_proxy()
         result = self.client.stdout.getvalue()
         expected = self.read_file('stdout.txt')
         self.assertEqual(result, expected)
@@ -178,9 +177,7 @@ class IOTest(unittest.TestCase):
         remote stderr should be copied to client stderr
         """
 
-        self.queue().put((self.client, sentinel.command))
-        proxy = Proxy(sentinel.socket, 'host', 1234)
-
+        self.make_proxy()
         result = self.client.stderr.getvalue()
         expected = self.read_file('stderr.txt')
         self.assertEqual(result, expected)
@@ -190,7 +187,6 @@ class IOTest(unittest.TestCase):
         all channels are closed after the session is over
         """
 
-        self.queue().put((self.client, sentinel.command))
-        proxy = Proxy(sentinel.socket, 'host', 1234)
+        self.make_proxy()
         self.client.close.assert_called_once_with()
         self.remote().close.assert_called_once_with()
