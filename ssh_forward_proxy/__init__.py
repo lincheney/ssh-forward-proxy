@@ -38,7 +38,7 @@ class ChannelStream:
     def stderr_ready(self, size):
         return self.channel.recv_stderr_ready()
 
-class FakeSocket:
+class StdSocket:
     """
     Fake socket to read from stdin and write to stdout
     conforming to the interface specified at
@@ -127,7 +127,7 @@ class Server(paramiko.ServerInterface):
 class Proxy(Server):
     def __init__(self, remote_host, remote_port, username=None, **kwargs):
         self.username = username
-        Server.__init__(self, FakeSocket())
+        Server.__init__(self, StdSocket())
 
         client, command = self.get_command()
         if not client:
@@ -190,8 +190,7 @@ class ServerWorker(Server):
             )
 
             pipe_streams(ChannelStream(client), ProcessStream(process))
-            if process.poll():
-                client.send_exit_status(process.returncode)
+            client.send_exit_status(process.wait())
         finally:
             if process:
                 try:
