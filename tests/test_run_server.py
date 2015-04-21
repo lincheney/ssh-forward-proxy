@@ -6,7 +6,7 @@ except ImportError:
 patch = mock.patch
 sentinel = mock.sentinel
 
-from ssh_forward_proxy import run_server, Proxy
+from ssh_forward_proxy import run_server, ServerWorker
 
 class RunServerTest(unittest.TestCase):
 
@@ -46,8 +46,8 @@ class RunServerTest(unittest.TestCase):
         thread.start = mock.Mock(side_effect=self.Error() )
 
         try:
-            run_server('host', 1234, key='value')
+            run_server('host', 1234)
         except self.Error:
             pass
-        Thread.assert_called_once_with(target=Proxy, args=(sentinel.socket,), kwargs=dict(key='value') )
+        Thread.assert_called_once_with(target=ServerWorker, args=(sentinel.socket,) )
         thread.start.assert_called_once_with()
