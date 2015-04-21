@@ -14,7 +14,8 @@ try:
 except ImportError:
     import Queue as queue
 
-from ssh_forward_proxy import Proxy
+import paramiko
+from ssh_forward_proxy import Proxy, StdSocket
 
 class WithSimpleProxy:
     """
@@ -26,6 +27,18 @@ class WithSimpleProxy:
         self.proxy_patch.start()
     def tearDown(self):
         self.proxy_patch.stop()
+
+class TransportTest(unittest.TestCase):
+    @patch('ssh_forward_proxy.StdSocket', return_value=sentinel.std_socket)
+    @patch('paramiko.Transport.start_server')
+    def test_std_socket_used(self, transport, std_socket):
+        """
+        proxy should connect SSH to stdin, stdout, stderr
+        """
+
+        with patch.object(Proxy, 'get_command', return_value=(None, None)):
+            proxy = Proxy('host', 1234)
+            self.assertIs(proxy.transport.sock, sentinel.std_socket)
 
 class UsernameTest(WithSimpleProxy, unittest.TestCase):
     """
