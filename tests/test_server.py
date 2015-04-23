@@ -71,11 +71,31 @@ class ServerWorkerTest(unittest.TestCase):
 
     def test_stdin_copied_to_remote(self):
         """
-        client stdin should be copied to remote's stdin
+        client stdin should be copied to process stdin
         """
 
         server = ServerWorker(sentinel.socket)
-        result = self.process.stdin.raw.getvalue()
+        result = self.process.stdin.getvalue()
         expected = fake_io.read_file('stdin.txt')
+        self.assertEqual(result, expected)
+
+    def test_stdout_copied_to_client(self):
+        """
+        remote stdout should be copied to client stdout
+        """
+
+        server = ServerWorker(sentinel.socket)
+        result = self.client.stdout.getvalue()
+        expected = fake_io.read_file('stdout.txt')
+        self.assertEqual(result, expected)
+
+    def test_stderr_copied_to_client(self):
+        """
+        remote stderr should be copied to client stderr
+        """
+
+        server = ServerWorker(sentinel.socket)
+        result = self.client.stderr.getvalue()
+        expected = fake_io.read_file('stderr.txt')
         self.assertEqual(result, expected)
 

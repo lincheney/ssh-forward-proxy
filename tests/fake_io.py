@@ -39,6 +39,7 @@ def FakeProcessSocket():
     m.input2 = open_file('stderr.txt')
     m.stderr = mock.Mock(wraps=m.input2, raw=m.input2)
 
-    m.stdin = mock.Mock(raw=BytesIO())
+    stdin = BytesIO()
+    m.stdin = mock.Mock(wraps=stdin, raw=stdin)
 
     return m
