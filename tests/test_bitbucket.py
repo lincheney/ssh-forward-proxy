@@ -18,13 +18,17 @@ import shutil
 import time
 import sys
 
+try:
+    from shlex import quote as shell_quote
+except ImportError:
+    from pipes import quote as shell_quote
+
 class BitBucketTest(unittest.TestCase):
 
     ROOT_DIR = os.path.abspath(os.path.join(__file__, '..', '..'))
     REPO_DIR = os.path.join(ROOT_DIR, 'tests', 'test-git-repo')
     SSH_KEY = os.path.join(ROOT_DIR, 'tests', 'ssh-forward-proxy-test-key')
 
-    REPO_HOST = 'git@bitbucket.org:22'
     REPO_URL = 'git@bitbucket.org:lincheney/ssh-forward-proxy-test.git'
 
     GIT_PATH = os.path.join(REPO_DIR, '.git')
@@ -47,16 +51,19 @@ class BitBucketTest(unittest.TestCase):
 
     def test_repo_accessible_through_proxy(self):
         PORT = '4000'
+        self.env['PROXY_ARGS'] = '-i ' + shell_quote(self.SSH_KEY)
         self.env['GIT_SSH'] = os.path.join(self.ROOT_DIR, 'tests', 'git_ssh_proxy.sh')
         self.env['PYTHONPATH'] = self.ROOT_DIR
-        # run the proxy
-        proxy_cmd = os.path.join(self.ROOT_DIR, 'bin', 'ssh-forward-proxy.py')
-        proxy = subprocess.Popen([sys.executable, proxy_cmd, self.REPO_HOST, PORT, '-i', self.SSH_KEY], env=self.env)
-        # wait a second
-        time.sleep(1)
-        self.assertIsNone( proxy.poll() )
 
+        server = None
         try:
+            # run the server
+            server_cmd = os.path.join(self.ROOT_DIR, 'bin', 'simple-ssh-server.py')
+            server = subprocess.Popen([sys.executable, server_cmd, PORT], env=self.env)
+            # wait a second
+            time.sleep(1)
+            self.assertIsNone( server.poll() )
+
             # clone
             subprocess.check_call(['git', 'clone', self.REPO_URL, self.REPO_DIR], env=self.env)
 
@@ -69,4 +76,5 @@ class BitBucketTest(unittest.TestCase):
                 readme = f.read()
             self.assertEqual(readme, self.README_TEXT)
         finally:
-            proxy.kill()
+            if server:
+                server.kill()
