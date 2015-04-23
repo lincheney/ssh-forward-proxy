@@ -23,11 +23,14 @@ try:
 except ImportError:
     from pipes import quote as shell_quote
 
+PYTHON = sys.executable
+
 class BitBucketTest(unittest.TestCase):
 
     ROOT_DIR = os.path.abspath(os.path.join(__file__, '..', '..'))
     REPO_DIR = os.path.join(ROOT_DIR, 'tests', 'test-git-repo')
     SSH_KEY = os.path.join(ROOT_DIR, 'tests', 'ssh-forward-proxy-test-key')
+    PROXY_PATH = os.path.join(ROOT_DIR, 'bin', 'ssh-forward-proxy.py')
 
     REPO_URL = 'git@bitbucket.org:lincheney/ssh-forward-proxy-test.git'
 
@@ -51,7 +54,10 @@ class BitBucketTest(unittest.TestCase):
 
     def test_repo_accessible_through_proxy(self):
         PORT = '4000'
-        self.env['PROXY_ARGS'] = '-i ' + shell_quote(self.SSH_KEY)
+
+        proxy_cmd = '{} {} %h %p %r -i {}'.format(PYTHON, self.PROXY_PATH, shell_quote(self.SSH_KEY))
+        proxy_cmd = ['ssh', '-p', '4000', 'localhost', proxy_cmd]
+        self.env['PROXY_CMD'] = ' '.join(map(shell_quote, proxy_cmd))
         self.env['GIT_SSH'] = os.path.join(self.ROOT_DIR, 'tests', 'git_ssh_proxy.sh')
         self.env['PYTHONPATH'] = self.ROOT_DIR
 
@@ -59,7 +65,7 @@ class BitBucketTest(unittest.TestCase):
         try:
             # run the server
             server_cmd = os.path.join(self.ROOT_DIR, 'bin', 'simple-ssh-server.py')
-            server = subprocess.Popen([sys.executable, server_cmd, PORT], env=self.env)
+            server = subprocess.Popen([PYTHON, server_cmd, PORT], env=self.env)
             # wait a second
             time.sleep(1)
             self.assertIsNone( server.poll() )
