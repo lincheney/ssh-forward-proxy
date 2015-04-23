@@ -8,13 +8,13 @@ sentinel = mock.sentinel
 
 import os
 import sys
-from io import BytesIO
 try:
     import queue
 except ImportError:
     import Queue as queue
 
 import paramiko
+from . import fake_io
 from ssh_forward_proxy import Proxy, StdSocket
 
 class WithSimpleProxy:
@@ -101,36 +101,9 @@ class IOTest(unittest.TestCase):
     class Error(Exception):
         pass
 
-    @staticmethod
-    def open_file(file):
-        return open(os.path.join(os.path.dirname(__file__), file), 'rb')
-    @staticmethod
-    def read_file(file):
-        with IOTest.open_file(file) as f:
-            return f.read()
-
-    @staticmethod
-    def FakeSocket(file):
-        m = mock.Mock()
-        m.input = IOTest.open_file(file)
-        m.stdout = BytesIO()
-        m.stderr = BytesIO()
-        m.fileno = m.input.fileno
-        m.recv = m.input.read
-        m.sendall = m.stdout.write
-        m.sendall_stderr = m.stderr.write
-        return m
-
-    @staticmethod
-    def FakeOutputSocket():
-        m = IOTest.FakeSocket('stdout.txt')
-        m.input2 = IOTest.open_file('stderr.txt')
-        m.recv_stderr = m.input2.read
-        return m
-
     def setUp(self):
-        self.remote_channel = self.FakeOutputSocket()
-        self.client = self.FakeSocket('stdin.txt')
+        self.remote_channel = fake_io.FakeOutputSocket()
+        self.client = fake_io.FakeSocket('stdin.txt')
 
         self.patches = []
         self.patches.append( patch.object(Proxy, 'connect_to_remote') )
@@ -172,7 +145,7 @@ class IOTest(unittest.TestCase):
 
         self.make_proxy()
         result = self.remote_channel.stdout.getvalue()
-        expected = self.read_file('stdin.txt')
+        expected = fake_io.read_file('stdin.txt')
         self.assertEqual(result, expected)
 
     def test_stdout_copied_to_client(self):
@@ -182,7 +155,7 @@ class IOTest(unittest.TestCase):
 
         self.make_proxy()
         result = self.client.stdout.getvalue()
-        expected = self.read_file('stdout.txt')
+        expected = fake_io.read_file('stdout.txt')
         self.assertEqual(result, expected)
 
     def test_stderr_copied_to_client(self):
@@ -192,7 +165,7 @@ class IOTest(unittest.TestCase):
 
         self.make_proxy()
         result = self.client.stderr.getvalue()
-        expected = self.read_file('stderr.txt')
+        expected = fake_io.read_file('stderr.txt')
         self.assertEqual(result, expected)
 
     def test_channels_closed(self):
