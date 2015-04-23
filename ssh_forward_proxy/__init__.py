@@ -127,9 +127,9 @@ class Server(paramiko.ServerInterface):
         return True
 
 class Proxy(Server):
-    def __init__(self, remote_host, remote_port, username=None, **kwargs):
+    def __init__(self, remote_host, remote_port, username=None, socket=None, **kwargs):
         self.username = username
-        Server.__init__(self, StdSocket())
+        Server.__init__(self, socket or StdSocket())
 
         client, command = self.get_command()
         if not client:

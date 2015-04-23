@@ -77,7 +77,7 @@ class RemoteConnectionTest(unittest.TestCase):
     """
 
     @patch('paramiko.SSHClient')
-    def test_connection_is_made(self, client):
+    def test_connects_to_remote(self, client):
         """
         it should connect to the remote
         """
@@ -95,6 +95,33 @@ class RemoteConnectionTest(unittest.TestCase):
     def test_client_is_returned(self, client):
         result = Proxy.connect_to_remote('abcdef', 12345, 'user')
         self.assertIs(result, client.return_value)
+
+class TransportTest(unittest.TestCase):
+    """
+    tests for the paramiko.Transport
+    """
+
+    @patch.object(Proxy, 'get_command', return_value=(None, None))
+    @patch('paramiko.Transport')
+    def test_transport_opened_to_std_streams(self, transport, get_command):
+        """
+        proxy should open SSH transport to stdin, stdout and stderrr
+        """
+
+        with patch('ssh_forward_proxy.StdSocket') as sock:
+            Proxy('host', 1234)
+            transport.assert_called_once_with(sock())
+
+    @patch.object(Proxy, 'get_command', return_value=(None, None))
+    @patch('paramiko.Transport')
+    def test_transport_opened_to_st(self, transport, get_command):
+        """
+        proxy should open SSH transport to given socket
+        """
+
+        Proxy('host', 1234, socket=sentinel.socket)
+        transport.assert_called_once_with(sentinel.socket)
+
 
 class IOTest(unittest.TestCase):
 
@@ -125,7 +152,7 @@ class IOTest(unittest.TestCase):
         self.client.input.close()
 
     def make_proxy(self):
-        return Proxy(sentinel.socket, 'host', 1234)
+        return Proxy('host', 1234)
 
     def test_exec_command_on_remote(self):
         """
