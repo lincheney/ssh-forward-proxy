@@ -15,8 +15,10 @@ import logging
 
 class ProcessStream:
     def __init__(self, process):
-        self.streams = [process.stdin, process.stdout, process.stderr]
-        self.stdin, self.stdout, self.stderr = self.streams
+        self.stdin = process.stdin
+        self.stdout = process.stdout
+        self.stderr = process.stderr
+        self.streams = [self.stdout, self.stderr]
         self.write = self.stdin.raw.write
         self.read = self.stdout.raw.read
         self.read_stderr = self.stderr.raw.read
@@ -183,10 +185,11 @@ class ServerWorker(Server):
         process = None
         try:
             process = subprocess.Popen(
-                ['sh', '-c', command],
+                command,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                shell=True,
             )
 
             pipe_streams(ChannelStream(client), ProcessStream(process))
