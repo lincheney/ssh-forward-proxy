@@ -6,6 +6,8 @@ except ImportError:
 patch = mock.patch
 sentinel = mock.sentinel
 
+from .test_proxy import IOTest, SimpleProxyTestCase
+
 import os
 import shlex
 import subprocess
@@ -18,7 +20,6 @@ try:
 except ImportError:
     import Queue as queue
 
-from .test_proxy import IOTest, SimpleProxyTestCase
 from ssh_forward_proxy import run_server, ProxyServer, Proxy
 
 class RemoteConnectionTest(SimpleProxyTestCase):

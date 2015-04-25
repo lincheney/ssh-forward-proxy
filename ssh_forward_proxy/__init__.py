@@ -34,7 +34,7 @@ class ServerInterface(paramiko.ServerInterface):
 
     def get_command(self):
         try:
-            return self.queue.get(self.timeout)
+            return self.queue.get(True, self.timeout)
         except queue.Empty:
             logging.error('Client passed no commands')
             self.transport.close()

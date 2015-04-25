@@ -6,6 +6,8 @@ except ImportError:
 patch = mock.patch
 sentinel = mock.sentinel
 
+from . import fake_io, helper
+
 import os
 import shlex
 import subprocess
@@ -18,7 +20,7 @@ try:
 except ImportError:
     import Queue as queue
 
-from . import fake_io, helper
+import paramiko
 from ssh_forward_proxy import run_server, Server
 
 class ServerScriptTest(unittest.TestCase):
@@ -55,6 +57,17 @@ class PatchedServer(helper.TestCase):
         self.add_patch( patch('paramiko.Transport') )
 
         self.queue = queue.Queue()
+
+class ServerTest(PatchedServer):
+    def test_no_ssh_command(self):
+        """
+        server should close transport and exit if no commands within the timeout
+        """
+
+        # reduce the timeout to 1 second
+        with patch.object(Server, 'timeout', new_callable=mock.PropertyMock(return_value=1)):
+            server = Server(sentinel.socket)
+            paramiko.Transport().close.assert_called_with()
 
 class ServerIOTest(PatchedServer):
 

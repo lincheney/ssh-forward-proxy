@@ -6,15 +6,15 @@ except ImportError:
 patch = mock.patch
 sentinel = mock.sentinel
 
+from . import fake_io, helper
+from .test_server import PatchedServer
+
 import os
 import sys
 try:
     import queue
 except ImportError:
     import Queue as queue
-
-from . import fake_io, helper
-from .test_server import PatchedServer
 
 import paramiko
 from ssh_forward_proxy import Proxy, StdSocket
