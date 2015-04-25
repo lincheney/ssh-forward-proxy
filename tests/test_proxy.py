@@ -13,8 +13,10 @@ try:
 except ImportError:
     import Queue as queue
 
+from . import fake_io, helper
+from .test_server import PatchedServer
+
 import paramiko
-from . import fake_io
 from ssh_forward_proxy import Proxy, StdSocket
 
 class WithSimpleProxy:
@@ -122,33 +124,26 @@ class TransportTest(unittest.TestCase):
         transport.assert_called_once_with(sentinel.socket)
 
 
-class IOTest(unittest.TestCase):
+class IOTest(helper.TestCase, PatchedServer):
     """
     tests that the proxy connects the remote to stdin,stdout,stderr
     """
 
-    def add_patch(self, patch):
-        patch.start()
-        self.patches.append(patch)
-
     def setUp(self):
-        self.client = fake_io.FakeSocket('stdin.txt')
-        self.remote_channel = fake_io.FakeOutputSocket()
+        super(IOTest, self).setUp()
+        self.setup_patches()
 
-        self.patches = []
-        self.add_patch( patch.object(queue, 'Queue', return_value=queue.Queue()) )
         self.add_patch( patch.object(Proxy, 'connect_to_remote') )
-        self.add_patch( patch('paramiko.Transport') )
-
-        self.queue = queue.Queue()
         self.remote = Proxy.connect_to_remote()
 
+        self.remote_channel = fake_io.FakeOutputSocket()
         self.remote.get_transport().open_session.return_value = self.remote_channel
+
+        self.client = fake_io.FakeSocket('stdin.txt')
         self.queue.put((self.client, sentinel.command))
 
     def tearDown(self):
-        for p in self.patches:
-            p.stop()
+        super(IOTest, self).tearDown()
         fake_io.close_fake_socket(self.remote_channel)
         fake_io.close_fake_socket(self.client)
 
