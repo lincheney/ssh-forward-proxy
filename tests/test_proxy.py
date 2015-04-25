@@ -113,13 +113,25 @@ class TransportTest(unittest.TestCase):
 
     @patch.object(Proxy, 'get_command', return_value=(None, None))
     @patch('paramiko.Transport')
-    def test_transport_opened_to_st(self, transport, get_command):
+    def test_transport_opened_to_socket(self, transport, get_command):
         """
         proxy should open SSH transport to given socket
         """
 
         Proxy(sentinel.socket)
         transport.assert_called_once_with(sentinel.socket)
+
+    @patch('paramiko.Transport')
+    def test_no_ssh_command(self, transport):
+        """
+        server should close transport and exit if no commands within the timeout
+        """
+
+        # reduce the timeout to 1 second
+        with patch.object(Proxy, 'timeout', new_callable=mock.PropertyMock(return_value=1)):
+            server = Proxy(sentinel.socket)
+            transport().close.assert_called_with()
+
 
 
 class IOTest(PatchedServer):
