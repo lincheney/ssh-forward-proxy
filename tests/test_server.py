@@ -18,7 +18,7 @@ try:
 except ImportError:
     import Queue as queue
 
-from . import fake_io
+from . import fake_io, helper
 from ssh_forward_proxy import run_server, Server
 
 class ServerScriptTest(unittest.TestCase):
@@ -39,35 +39,32 @@ class ServerScriptTest(unittest.TestCase):
             time.sleep(1)
             subprocess.check_call(['ssh', '-p', PORT, 'localhost', 'true'])
 
-
         finally:
             if server:
                 server.kill()
 
-class ServerTest(unittest.TestCase):
 
-    class Error(Exception):
-        pass
-
-    def add_patch(self, patch):
-        patch.start()
-        self.patches.append(patch)
-
-    def setUp(self):
-        self.client = fake_io.FakeSocket('stdin.txt')
-        self.process = fake_io.FakeProcessSocket()
-
-        self.patches = []
+class PatchedServer:
+    def setup_patches(self):
         self.add_patch( patch.object(queue, 'Queue', return_value=queue.Queue()) )
-        self.add_patch( patch('subprocess.Popen', return_value=self.process) )
         self.add_patch( patch('paramiko.Transport') )
 
         self.queue = queue.Queue()
+
+class ServerIOTest(helper.TestCase, PatchedServer):
+
+    def setUp(self):
+        super(ServerIOTest, self).setUp()
+        self.setup_patches()
+
+        self.client = fake_io.FakeSocket('stdin.txt')
         self.queue.put((self.client, sentinel.command))
 
+        self.process = fake_io.FakeProcessSocket()
+        self.add_patch( patch('subprocess.Popen', return_value=self.process) )
+
     def tearDown(self):
-        for p in self.patches:
-            p.stop()
+        super(ServerIOTest, self).tearDown()
         fake_io.close_fake_socket(self.client)
         fake_io.close_fake_socket(self.process)
 
@@ -102,3 +99,32 @@ class ServerTest(unittest.TestCase):
         expected = fake_io.read_file('stderr.txt')
         self.assertEqual(result, expected)
 
+class ServerProcessTest(helper.TestCase, PatchedServer):
+
+    def setUp(self):
+        super(ServerProcessTest, self).setUp()
+        self.setup_patches()
+        self.client = fake_io.FakeSocket('stdin.txt')
+
+    def tearDown(self):
+        super(ServerProcessTest, self).tearDown()
+        fake_io.close_fake_socket(self.client)
+
+    def test_returncode(self):
+        """
+        server should give the appropriate return code
+        """
+
+        self.queue.put((self.client, 'exit 5'))
+        self.client.closed = False
+        server = Server(sentinel.socket)
+        self.client.send_exit_status.assert_called_with(5)
+
+    def test_ssh_channel_closed(self):
+        """
+        server should exit if ssh channel closed even if process is still running
+        """
+
+        self.queue.put((self.client, 'sleep infinity'))
+        self.client.closed = True
+        server = Server(sentinel.socket)
