@@ -9,6 +9,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Forward all SSH requests to remote but authenticating as the proxy')
     parser.add_argument('-i', dest='identity_file', help='Path to identity file (same as ssh -i)')
     subparsers = parser.add_subparsers(dest='command')
+    subparsers.required = True
 
     sub = subparsers.add_parser('relay', help='Proxy SSH traffic on STDIN to the remote')
     sub.add_argument('port', type=int, help='Remote port')
