@@ -195,3 +195,20 @@ class ProcessStreamTest(unittest.TestCase):
         self.assertTrue( self.stream.stderr_ready(self.process.stderr) )
         self.assertFalse( self.stream.stderr_ready(self.process.stdin) )
         self.assertFalse( self.stream.stderr_ready(self.process.stdout) )
+
+class ChannelStreamTest(unittest.TestCase):
+    """
+    basic API test for ChannelStream
+    """
+
+    def test_api(self):
+        channel = mock.Mock()
+        stream = ChannelStream(channel)
+
+        self.assertEqual( stream.streams, [channel] )
+        self.assertTrue( hasattr(stream, 'read') )
+        self.assertTrue( hasattr(stream, 'read_stderr') )
+        self.assertTrue( hasattr(stream, 'write') )
+        self.assertTrue( hasattr(stream, 'write_stderr') )
+        self.assertTrue( hasattr(stream, 'stdout_ready') )
+        self.assertTrue( hasattr(stream, 'stderr_ready') )
