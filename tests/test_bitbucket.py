@@ -54,6 +54,18 @@ class BitBucketTest(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             subprocess.check_call(['git', 'clone', self.REPO_URL, self.REPO_DIR], env=self.env)
 
+    def check_git_clone(self, env):
+        # clone
+        subprocess.check_call(['git', 'clone', self.REPO_URL, self.REPO_DIR], env=env)
+
+        # check .git exists
+        self.assertTrue( os.path.exists(self.GIT_PATH) )
+        # check README exists
+        self.assertTrue( os.path.exists(self.README_PATH) )
+        # check README has correct contents
+        with open(self.README_PATH) as f:
+            self.assertEqual(f.read(), self.README_TEXT)
+
     def test_repo_accessible_through_proxy(self):
         PORT = '4000'
 
@@ -74,17 +86,7 @@ class BitBucketTest(unittest.TestCase):
             time.sleep(1)
             self.assertIsNone( server.poll() )
 
-            # clone
-            subprocess.check_call(['git', 'clone', self.REPO_URL, self.REPO_DIR], env=self.env)
-
-            # check .git exists
-            self.assertTrue( os.path.exists(self.GIT_PATH) )
-            # check README exists
-            self.assertTrue( os.path.exists(self.README_PATH) )
-            # check README has correct contents
-            with open(self.README_PATH) as f:
-                readme = f.read()
-            self.assertEqual(readme, self.README_TEXT)
+            self.check_git_clone(self.env)
         finally:
             if server:
                 server.kill()
@@ -106,17 +108,7 @@ class BitBucketTest(unittest.TestCase):
             time.sleep(1)
             self.assertIsNone( server.poll() )
 
-            # clone
-            subprocess.check_call(['git', 'clone', self.REPO_URL, self.REPO_DIR], env=self.env)
-
-            # check .git exists
-            self.assertTrue( os.path.exists(self.GIT_PATH) )
-            # check README exists
-            self.assertTrue( os.path.exists(self.README_PATH) )
-            # check README has correct contents
-            with open(self.README_PATH) as f:
-                readme = f.read()
-            self.assertEqual(readme, self.README_TEXT)
+            self.check_git_clone(self.env)
         finally:
             if server:
                 server.kill()
