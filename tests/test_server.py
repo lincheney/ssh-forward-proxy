@@ -30,7 +30,7 @@ class ServerScriptTest(unittest.TestCase):
         test that we can SSH into server
         """
 
-        PORT = '4000'
+        PORT = '4002'
         server = None
 
         self.env = {}
