@@ -44,18 +44,18 @@ class ServerScriptTest(unittest.TestCase):
                 server.kill()
 
 
-class PatchedServer:
-    def setup_patches(self):
+class PatchedServer(helper.TestCase):
+    def setUp(self):
+        super(PatchedServer, self).setUp()
         self.add_patch( patch.object(queue, 'Queue', return_value=queue.Queue()) )
         self.add_patch( patch('paramiko.Transport') )
 
         self.queue = queue.Queue()
 
-class ServerIOTest(helper.TestCase, PatchedServer):
+class ServerIOTest(PatchedServer):
 
     def setUp(self):
         super(ServerIOTest, self).setUp()
-        self.setup_patches()
 
         self.client = fake_io.FakeSocket('stdin.txt')
         self.queue.put((self.client, sentinel.command))
@@ -99,11 +99,10 @@ class ServerIOTest(helper.TestCase, PatchedServer):
         expected = fake_io.read_file('stderr.txt')
         self.assertEqual(result, expected)
 
-class ServerProcessTest(helper.TestCase, PatchedServer):
+class ServerProcessTest(PatchedServer):
 
     def setUp(self):
         super(ServerProcessTest, self).setUp()
-        self.setup_patches()
         self.client = fake_io.FakeSocket('stdin.txt')
 
     def tearDown(self):

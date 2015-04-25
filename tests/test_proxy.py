@@ -19,16 +19,14 @@ from .test_server import PatchedServer
 import paramiko
 from ssh_forward_proxy import Proxy, StdSocket
 
-class WithSimpleProxy:
+class SimpleProxyTestCase(helper.TestCase):
     """
     mocks out the __init__() method of Proxy
     """
 
     def setUp(self):
-        self.proxy_patch = patch.object(Proxy, '__init__', return_value=None)
-        self.proxy_patch.start()
-    def tearDown(self):
-        self.proxy_patch.stop()
+        super(SimpleProxyTestCase, self).setUp()
+        self.add_patch( patch.object(Proxy, '__init__', return_value=None) )
 
 class TransportTest(unittest.TestCase):
     @patch('ssh_forward_proxy.StdSocket', return_value=sentinel.std_socket)
@@ -42,7 +40,7 @@ class TransportTest(unittest.TestCase):
             proxy = Proxy('host', 1234)
             self.assertIs(proxy.transport.sock, sentinel.std_socket)
 
-class UsernameTest(WithSimpleProxy, unittest.TestCase):
+class UsernameTest(SimpleProxyTestCase):
     """
     tests for Proxy.check_auth_none
     """
@@ -57,7 +55,7 @@ class UsernameTest(WithSimpleProxy, unittest.TestCase):
         proxy.check_auth_none('abcdef')
         self.assertEqual(proxy.username, 'abcdef')
 
-class ExecTest(WithSimpleProxy, unittest.TestCase):
+class ExecTest(SimpleProxyTestCase):
     """
     tests for Proxy.check_channel_exec_request
     """
@@ -124,14 +122,13 @@ class TransportTest(unittest.TestCase):
         transport.assert_called_once_with(sentinel.socket)
 
 
-class IOTest(helper.TestCase, PatchedServer):
+class IOTest(PatchedServer):
     """
     tests that the proxy connects the remote to stdin,stdout,stderr
     """
 
     def setUp(self):
         super(IOTest, self).setUp()
-        self.setup_patches()
 
         self.add_patch( patch.object(Proxy, 'connect_to_remote') )
         self.remote = Proxy.connect_to_remote()
