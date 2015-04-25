@@ -133,16 +133,16 @@ class IOTest(PatchedServer):
         self.add_patch( patch.object(Proxy, 'connect_to_remote') )
         self.remote = Proxy.connect_to_remote()
 
-        self.remote_channel = fake_io.FakeOutputSocket()
+        self.remote_channel = fake_io.FakeOutputChannel()
         self.remote.get_transport().open_session.return_value = self.remote_channel
 
-        self.client = fake_io.FakeSocket('stdin.txt')
+        self.client = fake_io.FakeInputChannel()
         self.queue.put((self.client, sentinel.command))
 
     def tearDown(self):
         super(IOTest, self).tearDown()
-        fake_io.close_fake_socket(self.remote_channel)
-        fake_io.close_fake_socket(self.client)
+        fake_io.close_fake_io(self.remote_channel)
+        fake_io.close_fake_io(self.client)
 
     def make_proxy(self):
         return Proxy(host='host', port=1234)

@@ -13,7 +13,7 @@ def read_file(file):
     with open_file(file) as f:
         return f.read()
 
-def FakeSocket(file):
+def FakeInputChannel(file='stdin.txt'):
     m = mock.Mock()
     m.inputs = [open_file(file)]
     m.stdout = BytesIO()
@@ -24,13 +24,13 @@ def FakeSocket(file):
     m.sendall_stderr = m.stderr.write
     return m
 
-def FakeOutputSocket():
-    m = FakeSocket('stdout.txt')
+def FakeOutputChannel():
+    m = FakeInputChannel('stdout.txt')
     m.inputs.append( open_file('stderr.txt') )
     m.recv_stderr = m.inputs[-1].read
     return m
 
-def FakeProcessSocket():
+def FakeProcess():
     m = mock.Mock()
 
     m.stdout = open_file('stdout.txt')
@@ -45,6 +45,6 @@ def FakeProcessSocket():
 
     return m
 
-def close_fake_socket(socket):
-    for i in socket.inputs:
+def close_fake_io(io):
+    for i in io.inputs:
         i.close()

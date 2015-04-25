@@ -61,16 +61,16 @@ class ServerIOTest(PatchedServer):
     def setUp(self):
         super(ServerIOTest, self).setUp()
 
-        self.client = fake_io.FakeSocket('stdin.txt')
+        self.client = fake_io.FakeInputChannel()
         self.queue.put((self.client, sentinel.command))
 
-        self.process = fake_io.FakeProcessSocket()
+        self.process = fake_io.FakeProcess()
         self.add_patch( patch('subprocess.Popen', return_value=self.process) )
 
     def tearDown(self):
         super(ServerIOTest, self).tearDown()
-        fake_io.close_fake_socket(self.client)
-        fake_io.close_fake_socket(self.process)
+        fake_io.close_fake_io(self.client)
+        fake_io.close_fake_io(self.process)
 
     def test_stdin_copied_to_remote(self):
         """
@@ -107,11 +107,11 @@ class ServerProcessTest(PatchedServer):
 
     def setUp(self):
         super(ServerProcessTest, self).setUp()
-        self.client = fake_io.FakeSocket('stdin.txt')
+        self.client = fake_io.FakeInputChannel()
 
     def tearDown(self):
         super(ServerProcessTest, self).tearDown()
-        fake_io.close_fake_socket(self.client)
+        fake_io.close_fake_io(self.client)
 
     def test_returncode(self):
         """
