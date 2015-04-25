@@ -10,11 +10,6 @@ try:
 except ImportError:
     import Queue as queue
 
-try:
-    ProcessLookupError
-except NameError:
-    ProcessLookupError = None
-
 import logging
 
 from .util import *
@@ -146,18 +141,12 @@ class Server(ServerInterface):
         return 'none'
 
     def kill_process(self, process):
-        if not process:
-            return
-        try:
+        if process:
             process.stdout.close()
             process.stdin.close()
             process.stderr.close()
-            process.kill()
-        except OSError as e:
-            if e.errno != errno.ESRCH:
-                raise
-        except ProcessLookupError:
-            pass
+            if process.poll() is None:
+                process.kill()
 
 def run_server(host, port, worker=Server, **kwargs):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
