@@ -2,8 +2,24 @@ import sys
 import os
 import select
 import socket
+import errno
 
 import logging
+
+try:
+    BrokenPipeError
+except NameError:
+    BrokenPipeError = None
+
+def ignore_broken_pipe(fn, *args):
+    try:
+        return fn(*args)
+    except OSError as e:
+        if e.errno == errno.EPIPE:
+            return None
+        raise
+    except BrokenPipeError:
+        return None
 
 class StdSocket:
     """
@@ -55,7 +71,7 @@ class ProcessStream(Stream):
         self.streams = [self.stdout, self.stderr]
 
     def write(self, string):
-        return os.write(self.stdin.fileno(), string)
+        return ignore_broken_pipe(os.write, self.stdin.fileno(), string)
 
     def read(self, n):
         return os.read(self.stdout.fileno(), n)
