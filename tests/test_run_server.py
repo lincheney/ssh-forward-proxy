@@ -49,29 +49,28 @@ class RunServerTest(unittest.TestCase):
         Thread.assert_called_once_with(target=sentinel.worker, args=(sentinel.socket,), kwargs={'key': 'value'})
         thread.start.assert_called_once_with()
 
-    @patch('socket.socket.close')
-    @patch('socket.socket.bind')
-    def test_keyboard_interrupt(self, bind, close):
+    @patch('socket.socket')
+    def test_keyboard_interrupt(self, socket):
         """
         the server should start a thread for the proxy on accept()
         """
 
-        with patch('socket.socket.accept', side_effect=self.send_sig_int):
-            run_server('host', 1234, key='value', worker=sentinel.worker)
-            close.assert_called_once_with()
+        socket().accept = self.send_sig_int
+        run_server('host', 1234, key='value', worker=sentinel.worker)
+        socket().close.assert_called_once_with()
 
     def send_sig_int(self):
         pid = os.getpid()
         os.kill(pid, signal.SIGINT)
+        return None, None
 
-    @patch('socket.socket.close')
-    @patch('socket.socket.bind')
-    def test_error(self, bind, close):
+    @patch('socket.socket')
+    def test_error(self, socket):
         """
         the server should start a thread for the proxy on accept()
         """
 
-        with patch('socket.socket.accept', side_effect=self.Error):
-            with self.assertRaises(self.Error):
-                run_server('host', 1234, key='value', worker=sentinel.worker)
-            close.assert_called_once_with()
+        socket().accept.side_effect = self.Error
+        with self.assertRaises(self.Error):
+            run_server('host', 1234, key='value', worker=sentinel.worker)
+        socket().close.assert_called_once_with()
