@@ -84,12 +84,11 @@ class RemoteConnectionTest(unittest.TestCase):
 
         host = 'abcdef'
         port = 12345
-        user = 'user'
-        kwargs = {'key': 'value'}
-        Proxy.connect_to_remote(host, port, user, **kwargs)
+        kwargs = {'username': 'user', 'key': 'value'}
+        Proxy.connect_to_remote(host=host, port=port, **kwargs)
 
         client.assert_called_once_with()
-        client.return_value.connect.assert_called_once_with(host, port, username=user, **kwargs)
+        client.return_value.connect.assert_called_once_with(host, port, **kwargs)
 
     @patch('paramiko.SSHClient')
     def test_client_is_returned(self, client):
@@ -109,7 +108,7 @@ class TransportTest(unittest.TestCase):
         """
 
         with patch('ssh_forward_proxy.StdSocket') as sock:
-            Proxy('host', 1234)
+            Proxy()
             transport.assert_called_once_with(sock())
 
     @patch.object(Proxy, 'get_command', return_value=(None, None))
@@ -119,50 +118,49 @@ class TransportTest(unittest.TestCase):
         proxy should open SSH transport to given socket
         """
 
-        Proxy('host', 1234, socket=sentinel.socket)
+        Proxy(sentinel.socket)
         transport.assert_called_once_with(sentinel.socket)
 
 
 class IOTest(unittest.TestCase):
+    """
+    tests that the proxy connects the remote to stdin,stdout,stderr
+    """
 
-    class Error(Exception):
-        pass
+    def add_patch(self, patch):
+        patch.start()
+        self.patches.append(patch)
 
     def setUp(self):
-        self.remote_channel = fake_io.FakeOutputSocket()
         self.client = fake_io.FakeSocket('stdin.txt')
+        self.remote_channel = fake_io.FakeOutputSocket()
 
         self.patches = []
-        self.patches.append( patch.object(Proxy, 'connect_to_remote') )
-        self.patches.append( patch.object(queue, 'Queue', return_value=queue.Queue()) )
-        self.patches.append( patch('paramiko.Transport') )
+        self.add_patch( patch.object(queue, 'Queue', return_value=queue.Queue()) )
+        self.add_patch( patch.object(Proxy, 'connect_to_remote') )
+        self.add_patch( patch('paramiko.Transport') )
 
-        self.patched = [p.start() for p in self.patches]
-        self.remote = self.patched[0]
-        self.queue = self.patched[1]
+        self.queue = queue.Queue()
+        self.remote = Proxy.connect_to_remote()
 
-        self.remote().get_transport().open_session.return_value = self.remote_channel
-        self.queue().put((self.client, sentinel.command))
+        self.remote.get_transport().open_session.return_value = self.remote_channel
+        self.queue.put((self.client, sentinel.command))
 
     def tearDown(self):
         for p in self.patches:
             p.stop()
-        self.remote_channel.input.close()
-        self.remote_channel.input2.close()
-        self.client.input.close()
+        fake_io.close_fake_socket(self.remote_channel)
+        fake_io.close_fake_socket(self.client)
 
     def make_proxy(self):
-        return Proxy('host', 1234)
+        return Proxy(host='host', port=1234)
 
     def test_exec_command_on_remote(self):
         """
         command should be executed on remote
         """
 
-        try:
-            self.make_proxy()
-        except self.Error:
-            pass
+        self.make_proxy()
         self.remote_channel.exec_command.assert_called_once_with(sentinel.command)
 
     def test_stdin_copied_to_remote(self):
@@ -202,4 +200,4 @@ class IOTest(unittest.TestCase):
 
         self.make_proxy()
         self.client.close.assert_called_once_with()
-        self.remote().close.assert_called_once_with()
+        self.remote.close.assert_called_once_with()

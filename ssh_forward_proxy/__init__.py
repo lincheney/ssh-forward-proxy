@@ -1,100 +1,26 @@
 import sys
-import os
 import socket
-import select
 import paramiko
 import threading
 import subprocess
+import errno
 
 try:
     import queue
 except ImportError:
     import Queue as queue
 
+try:
+    ProcessLookupError
+except NameError:
+    ProcessLookupError = None
+
 import logging
 
-class ProcessStream:
-    def __init__(self, process):
-        self.stdin = process.stdin
-        self.stdout = process.stdout
-        self.stderr = process.stderr
-        self.streams = [self.stdout, self.stderr]
-        self.write = self.stdin.raw.write
-        self.read = self.stdout.raw.read
-        self.read_stderr = self.stderr.raw.read
-    def stdout_ready(self, stream):
-        return stream is self.stdout
-    def stderr_ready(self, stream):
-        return stream is self.stderr
+from .util import *
+from .stream import *
 
-class ChannelStream:
-    def __init__(self, channel):
-        self.channel = channel
-        self.streams = [channel]
-        self.write = self.channel.sendall
-        self.write_stderr = self.channel.sendall_stderr
-        self.read = self.channel.recv
-        self.read_stderr = self.channel.recv_stderr
-    def stdout_ready(self, stream):
-        return self.channel.recv_ready()
-    def stderr_ready(self, size):
-        return self.channel.recv_stderr_ready()
-
-class StdSocket:
-    """
-    Fake socket to read from stdin and write to stdout
-    conforming to the interface specified at
-    http://docs.paramiko.org/en/1.15/api/transport.html
-    """
-
-    timeout = None
-    def settimeout(self, timeout):
-        self.timeout = timeout
-
-    def send(self, string):
-        if sys.stdout.closed:
-            return 0
-        return os.write(sys.stdout.fileno(), string)
-
-    def recv(self, count):
-        if sys.stdin.closed:
-            return ''
-        r, w, x = select.select([sys.stdin], [], [], self.timeout)
-        if sys.stdin in r:
-            return os.read(sys.stdin.fileno(), count)
-        raise socket.timeout()
-
-    def close(self):
-        sys.stdin.close()
-        sys.stdout.close()
-
-
-def pipe_streams(input, output, size=1024):
-    done = False
-    while not done:
-        r, w, x = select.select(input.streams + output.streams, [], [])
-
-        for stream in r:
-            if stream in output.streams:
-                stdout = (output.stdout_ready(stream) and output.read(size))
-                if stdout:
-                    input.write(stdout)
-                stderr = (output.stderr_ready(stream) and output.read_stderr(size))
-                if stderr:
-                    input.write_stderr(stderr)
-                if not stdout and not stderr:
-                    logging.debug('Output streams closed')
-                    done = True
-
-            if stream in input.streams:
-                stdin = input.read(size)
-                if stdin:
-                    output.write(stdin)
-                else:
-                    logging.debug('Input streams closed')
-                    done = True
-
-class Server(paramiko.ServerInterface):
+class ServerInterface(paramiko.ServerInterface):
     timeout = 10
     host_key = paramiko.RSAKey(filename='server-key')
 
@@ -126,23 +52,19 @@ class Server(paramiko.ServerInterface):
         self.queue.put((channel, command))
         return True
 
-class Proxy(Server):
-    def __init__(self, remote_host, remote_port, username=None, socket=None, **kwargs):
+class Proxy(ServerInterface):
+    def __init__(self, socket=None, username=None, **kwargs):
         self.username = username
-        Server.__init__(self, socket or StdSocket())
+        ServerInterface.__init__(self, socket or StdSocket())
 
         client, command = self.get_command()
-        if not client:
-            return
+        if client:
+            self.relay_to_remote(client, command, username=self.username, **kwargs)
 
+    def relay_to_remote(self, client, command, *args, **kwargs):
         self.remote = None
         try:
-            self.remote = self.connect_to_remote(
-                remote_host,
-                remote_port,
-                username or self.username,
-                **kwargs
-            )
+            self.remote = self.connect_to_remote(*args, **kwargs)
             remote = self.remote.get_transport().open_session()
             remote.exec_command(command)
 
@@ -173,9 +95,25 @@ class Proxy(Server):
     def get_allowed_auths(self, username):
         return 'none'
 
-class ServerWorker(Server):
+class ProxyServer(Proxy):
+    HOST = b'__HOST__'
+
+    def __init__(self, *args, **kwargs):
+        self.env = {}
+        Proxy.__init__(self, *args, **kwargs)
+
+    def check_channel_env_request(self, channel, key, value):
+        self.env[key] = value
+        return True
+
+    def relay_to_remote(self, *args, **kwargs):
+        username, host, port = parse_host_string(self.env[self.HOST].decode('utf-8'))
+        kwargs.update(username=username, host=host, port=port)
+        return super(ProxyServer, self).relay_to_remote(*args, **kwargs)
+
+class Server(ServerInterface):
     def __init__(self, socket):
-        Server.__init__(self, socket)
+        ServerInterface.__init__(self, socket)
 
         client, command = self.get_command()
         if not client:
@@ -193,13 +131,10 @@ class ServerWorker(Server):
             )
 
             pipe_streams(ChannelStream(client), ProcessStream(process))
-            client.send_exit_status(process.wait())
+            if not client.closed:
+                client.send_exit_status(process.wait())
         finally:
-            if process:
-                try:
-                    process.kill()
-                except ProcessLookupError:
-                    pass
+            self.kill_process(process)
             client.close()
             self.transport.close()
 
@@ -209,8 +144,18 @@ class ServerWorker(Server):
     def get_allowed_auths(self, username):
         return 'none'
 
+    def kill_process(self, process):
+        if not process:
+            return
+        try:
+            process.kill()
+        except OSError as e:
+            if e.errno != errno.ESRCH:
+                raise
+        except ProcessLookupError:
+            pass
 
-def run_server(host, port):
+def run_server(host, port, worker=Server, **kwargs):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     logging.debug('bind()')
@@ -230,7 +175,7 @@ def run_server(host, port):
             client, address = sock.accept()
             logging.info('Got a connection!')
 
-            thread = threading.Thread(target=ServerWorker, args=(client,))
+            thread = threading.Thread(target=worker, args=(client,), kwargs=kwargs)
             thread.daemon = True
             threads.append(thread)
             thread.start()
@@ -239,4 +184,3 @@ def run_server(host, port):
         pass
     finally:
         sock.close()
-        sys.exit(0)

@@ -15,31 +15,36 @@ def read_file(file):
 
 def FakeSocket(file):
     m = mock.Mock()
-    m.input = open_file(file)
+    m.inputs = [open_file(file)]
     m.stdout = BytesIO()
     m.stderr = BytesIO()
-    m.fileno = m.input.fileno
-    m.recv = m.input.read
+    m.fileno = m.inputs[0].fileno
+    m.recv = m.inputs[0].read
     m.sendall = m.stdout.write
     m.sendall_stderr = m.stderr.write
     return m
 
 def FakeOutputSocket():
     m = FakeSocket('stdout.txt')
-    m.input2 = open_file('stderr.txt')
-    m.recv_stderr = m.input2.read
+    m.inputs.append( open_file('stderr.txt') )
+    m.recv_stderr = m.inputs[-1].read
     return m
 
 def FakeProcessSocket():
     m = mock.Mock()
 
-    m.input = open_file('stdout.txt')
-    m.stdout = mock.Mock(wraps=m.input, raw=m.input)
+    m.stdout = open_file('stdout.txt')
+    m.stderr = open_file('stderr.txt')
 
-    m.input2 = open_file('stderr.txt')
-    m.stderr = mock.Mock(wraps=m.input2, raw=m.input2)
+    stdin = os.pipe()
+    stdin = [os.fdopen(stdin[0], 'rb'), os.fdopen(stdin[1], 'wb')]
+    m.stdin = stdin[1]
+    m.readable_stdin = stdin[0]
 
-    stdin = BytesIO()
-    m.stdin = mock.Mock(wraps=stdin, raw=stdin)
+    m.inputs = [m.stdout, m.stderr] + stdin
 
     return m
+
+def close_fake_socket(socket):
+    for i in socket.inputs:
+        i.close()
