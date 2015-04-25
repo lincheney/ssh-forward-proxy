@@ -148,6 +148,9 @@ class Server(ServerInterface):
         if not process:
             return
         try:
+            process.stdout.close()
+            process.stdin.close()
+            process.stderr.close()
             process.kill()
         except OSError as e:
             if e.errno != errno.ESRCH:

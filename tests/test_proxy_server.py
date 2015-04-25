@@ -19,10 +19,10 @@ except ImportError:
     import Queue as queue
 
 from . import fake_io
+from .test_proxy import IOTest, SimpleProxyTestCase
 from ssh_forward_proxy import run_server, ProxyServer, Proxy
-from .test_proxy import IOTest, WithSimpleProxy
 
-class RemoteConnectionTest(WithSimpleProxy, unittest.TestCase):
+class RemoteConnectionTest(SimpleProxyTestCase):
     """
     tests that ProxyServer connects to remote given in HOST environment variable
     """
