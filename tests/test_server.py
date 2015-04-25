@@ -105,19 +105,17 @@ class ServerIOTest(PatchedServer):
 
 class ServerProcessTest(PatchedServer):
 
-    def setUp(self):
-        super(ServerProcessTest, self).setUp()
-        self.client = fake_io.FakeInputChannel()
-
     def tearDown(self):
         super(ServerProcessTest, self).tearDown()
-        fake_io.close_fake_io(self.client)
+        if self.client:
+            fake_io.close_fake_io(self.client)
 
     def test_returncode(self):
         """
         server should give the appropriate return code
         """
 
+        self.client = fake_io.FakeInputChannel()
         self.queue.put((self.client, 'exit 5'))
         self.client.closed = False
         server = Server(sentinel.socket)
@@ -128,6 +126,17 @@ class ServerProcessTest(PatchedServer):
         server should exit if ssh channel closed even if process is still running
         """
 
-        self.queue.put((self.client, 'sleep infinity'))
+        self.client = fake_io.FakeInputChannel()
+        self.queue.put((self.client, 'yes'))
         self.client.closed = True
         server = Server(sentinel.socket)
+
+    def test_process_closed(self):
+        """
+        server should exit if process closed even if client is still connected
+        """
+
+        self.client = fake_io.FakeInputChannel(cmd=['yes'])
+        self.queue.put((self.client, 'true'))
+        server = Server(sentinel.socket)
+        self.assertIsNone( self.client.inputs[0].poll() )
