@@ -9,6 +9,8 @@ sentinel = mock.sentinel
 import sys
 import os
 import socket
+import subprocess
+PIPE = subprocess.PIPE
 
 from ssh_forward_proxy import StdSocket, ChannelStream, ProcessStream
 
@@ -45,9 +47,9 @@ class StdSocketTest(unittest.TestCase):
         send() should write to stdout
         """
 
-        StdSocket().send('hello')
+        StdSocket().send(b'hello')
         self.stdout[1].close()
-        self.assertEqual( self.stdout[0].read(), 'hello' )
+        self.assertEqual( self.stdout[0].read(), b'hello' )
 
     def test_send_closed(self):
         """
@@ -62,12 +64,12 @@ class StdSocketTest(unittest.TestCase):
         recv() should read from stdin
         """
 
-        string = 'abcdefgh'
-        self.stdin[1].write(string)
+        bytes = b'abcdefgh'
+        self.stdin[1].write(bytes)
         self.stdin[1].close()
         result = StdSocket().recv(4)
-        self.assertEqual( result, string[:4] )
-        self.assertEqual( self.stdin[0].read(), string[4:] )
+        self.assertEqual( result, bytes[:4] )
+        self.assertEqual( self.stdin[0].read(), bytes[4:] )
 
     def test_recv_closed(self):
         """
@@ -98,3 +100,98 @@ class StdSocketTest(unittest.TestCase):
         sys.stdin.close.assert_called_once_with()
         sys.stdout.close.assert_called_once_with()
 
+class ProcessStreamTest(unittest.TestCase):
+
+    def make_process(self, cmd):
+        self.process = subprocess.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, shell=True)
+        return self.process
+
+    def make_stream(self, cmd):
+        self.stream = ProcessStream(self.make_process(cmd))
+        return self.stream
+
+    def tearDown(self):
+        self.process.stdin.close()
+        self.process.stdout.close()
+        self.process.stderr.close()
+        if self.process.poll() is None:
+            self.process.kill()
+
+    def test_streams(self):
+        """
+        streams should have the readable streams
+        """
+
+        self.make_stream('true')
+        self.assertEqual( self.stream.streams, [self.process.stdout, self.process.stderr] )
+
+    def test_write(self):
+        """
+        writes to stdin
+        """
+
+        self.make_stream('tr l m').write(b'hello') # swap l with m
+        self.process.stdin.close()
+        self.assertEqual( self.process.stdout.read(), b'hemmo' )
+
+    def test_read(self):
+        """
+        reads from stdout
+        """
+
+        bytes = b'abcdefgh'
+        self.make_stream( 'echo {}'.format(bytes.decode('utf-8')) )
+        result = self.stream.read(4)
+        self.assertEqual( result, bytes[:4] )
+        self.assertEqual( self.process.stdout.read(), bytes[4:] + b'\n' )
+
+    def test_read_more(self):
+        """
+        does not block when reading more than is available
+        """
+
+        bytes = b'abcdefgh'
+        self.make_stream( 'echo {} && sleep infinity'.format(bytes.decode('utf-8')) )
+        result = self.stream.read(100)
+        self.assertEqual( result, bytes + b'\n' )
+
+    def test_read_stderr(self):
+        """
+        reads from stderr
+        """
+
+        bytes = b'abcdefgh'
+        self.make_stream( 'echo {} >&2'.format(bytes.decode('utf-8')) )
+        result = self.stream.read_stderr(4)
+        self.assertEqual( result, bytes[:4] )
+        self.assertEqual( self.process.stderr.read(), bytes[4:] + b'\n' )
+
+    def test_read_stderr_more(self):
+        """
+        does not block when reading more than is available
+        """
+
+        bytes = b'abcdefgh'
+        self.make_stream( 'echo {} >&2 && sleep infinity'.format(bytes.decode('utf-8')) )
+        result = self.stream.read_stderr(100)
+        self.assertEqual( result, bytes + b'\n' )
+
+    def test_stdout_ready(self):
+        """
+        basically just tests if the stream is correct
+        """
+
+        self.make_stream('true')
+        self.assertTrue( self.stream.stdout_ready(self.process.stdout) )
+        self.assertFalse( self.stream.stdout_ready(self.process.stdin) )
+        self.assertFalse( self.stream.stdout_ready(self.process.stderr) )
+
+    def test_stderr_ready(self):
+        """
+        basically just tests if the stream is correct
+        """
+
+        self.make_stream('true')
+        self.assertTrue( self.stream.stderr_ready(self.process.stderr) )
+        self.assertFalse( self.stream.stderr_ready(self.process.stdin) )
+        self.assertFalse( self.stream.stderr_ready(self.process.stdout) )

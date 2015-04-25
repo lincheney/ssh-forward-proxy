@@ -73,7 +73,7 @@ class ChannelStream:
     def stdout_ready(self, stream):
         return self.channel.recv_ready()
 
-    def stderr_ready(self, size):
+    def stderr_ready(self, stream):
         return self.channel.recv_stderr_ready()
 
 
