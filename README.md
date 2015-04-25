@@ -1,7 +1,6 @@
 # ssh-forward-proxy
 
 [![Build Status](https://travis-ci.org/lincheney/ssh-forward-proxy.svg?branch=master)](https://travis-ci.org/lincheney/ssh-forward-proxy)
-
 [![Code Climate][CC img]][Code Climate]
 [![Coverage Status][CS img]][Coverage Status]
 
