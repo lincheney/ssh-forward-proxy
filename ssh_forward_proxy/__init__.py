@@ -79,9 +79,10 @@ class Proxy(ServerInterface):
             self.transport.close()
 
     @staticmethod
-    def connect_to_remote(host, port, username, **kwargs):
+    def connect_to_remote(host, port, username, host_key_check=True, **kwargs):
         client = paramiko.SSHClient()
-        client.load_system_host_keys()
+        if host_key_check:
+            client.load_system_host_keys()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         logging.info('Connecting to ssh host %s@%s:%s ...', username, host, port)

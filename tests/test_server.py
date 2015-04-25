@@ -41,7 +41,7 @@ class ServerScriptTest(unittest.TestCase):
             server = subprocess.Popen([sys.executable, server_cmd, PORT], env=self.env)
             # wait a second
             time.sleep(1)
-            subprocess.check_call(['ssh', '-p', PORT, 'localhost', 'true'])
+            subprocess.check_call(['ssh', '-o', 'StrictHostKeyChecking=no', '-p', PORT, 'localhost', 'true'])
 
         finally:
             if server:

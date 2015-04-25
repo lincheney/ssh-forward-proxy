@@ -60,7 +60,7 @@ class BitBucketTest(unittest.TestCase):
         proxy = shell_quote(self.PROXY_PATH)
         key = shell_quote(self.SSH_KEY)
 
-        self.env['PROXY_CMD'] = '{} {} -i {} relay %p %h %r'.format(PYTHON, proxy, key)
+        self.env['PROXY_CMD'] = '{} {} -i {} --no-host-key-check relay %p %h %r'.format(PYTHON, proxy, key)
         self.env['GIT_SSH'] = os.path.join(self.ROOT_DIR, 'tests', 'git_ssh_proxy.sh')
         self.env['PYTHONPATH'] = self.ROOT_DIR
 
@@ -91,7 +91,7 @@ class BitBucketTest(unittest.TestCase):
     def test_repo_accessible_through_standalone_proxy(self):
         PORT = '4000'
 
-        proxy_cmd = [PYTHON, self.PROXY_PATH, '-i', self.SSH_KEY, 'server', PORT]
+        proxy_cmd = [PYTHON, self.PROXY_PATH, '-i', self.SSH_KEY, '--no-host-key-check', 'server', PORT]
         self.env['GIT_SSH'] = os.path.join(self.ROOT_DIR, 'tests', 'git_ssh_standalone_proxy.sh')
         self.env['PYTHONPATH'] = self.ROOT_DIR
 
