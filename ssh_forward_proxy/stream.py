@@ -23,7 +23,7 @@ class StdSocket:
 
     def recv(self, count):
         if sys.stdin.closed:
-            return ''
+            return b''
         r, w, x = select.select([sys.stdin], [], [], self.timeout)
         if sys.stdin in r:
             return os.read(sys.stdin.fileno(), count)
@@ -33,8 +33,20 @@ class StdSocket:
         sys.stdin.close()
         sys.stdout.close()
 
+class Stream:
+    def pipe_stdout(self, stream, other, size):
+        stdout = (self.stdout_ready(stream) and self.read(size))
+        if stdout:
+            other.write(stdout)
+        return stdout
 
-class ProcessStream:
+    def pipe_stderr(self, stream, other, size):
+        stderr = (self.stderr_ready(stream) and self.read_stderr(size))
+        if stderr:
+            other.write_stderr(stderr)
+        return stderr
+
+class ProcessStream(Stream):
     def __init__(self, process):
         self.stdin = process.stdin
         self.stdout = process.stdout
@@ -58,7 +70,7 @@ class ProcessStream:
         return stream is self.stderr
 
 
-class ChannelStream:
+class ChannelStream(Stream):
     def __init__(self, channel):
         self.channel = channel
 
@@ -84,20 +96,14 @@ def pipe_streams(input, output, size=1024):
 
         for stream in r:
             if stream in output.streams:
-                stdout = (output.stdout_ready(stream) and output.read(size))
-                if stdout:
-                    input.write(stdout)
-                stderr = (output.stderr_ready(stream) and output.read_stderr(size))
-                if stderr:
-                    input.write_stderr(stderr)
-                if not stdout and not stderr:
+                stdout = output.pipe_stdout(stream, input, size)
+                stderr = output.pipe_stderr(stream, input, size)
+                if not (stdout or stderr):
                     logging.debug('Output streams closed')
                     done = True
 
             if stream in input.streams:
-                stdin = input.read(size)
-                if stdin:
-                    output.write(stdin)
-                else:
+                stdin = input.pipe_stdout(stream, output, size)
+                if not stdin:
                     logging.debug('Input streams closed')
                     done = True

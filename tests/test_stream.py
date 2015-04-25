@@ -14,6 +14,8 @@ PIPE = subprocess.PIPE
 
 from ssh_forward_proxy import StdSocket, ChannelStream, ProcessStream
 
+DATA = b'abcdefgh'
+
 class StdSocketTest(unittest.TestCase):
 
     def make_pipe(self):
@@ -47,9 +49,9 @@ class StdSocketTest(unittest.TestCase):
         send() should write to stdout
         """
 
-        StdSocket().send(b'hello')
+        StdSocket().send(DATA)
         self.stdout[1].close()
-        self.assertEqual( self.stdout[0].read(), b'hello' )
+        self.assertEqual( self.stdout[0].read(), DATA )
 
     def test_send_closed(self):
         """
@@ -57,19 +59,18 @@ class StdSocketTest(unittest.TestCase):
         """
 
         self.stdout[1].close()
-        self.assertEqual( StdSocket().send('hello'), 0 )
+        self.assertEqual( StdSocket().send(DATA), 0 )
 
     def test_recv(self):
         """
         recv() should read from stdin
         """
 
-        bytes = b'abcdefgh'
-        self.stdin[1].write(bytes)
+        self.stdin[1].write(DATA)
         self.stdin[1].close()
         result = StdSocket().recv(4)
-        self.assertEqual( result, bytes[:4] )
-        self.assertEqual( self.stdin[0].read(), bytes[4:] )
+        self.assertEqual( result, DATA[:4] )
+        self.assertEqual( self.stdin[0].read(), DATA[4:] )
 
     def test_recv_closed(self):
         """
@@ -77,7 +78,7 @@ class StdSocketTest(unittest.TestCase):
         """
 
         self.stdin[0].close()
-        self.assertEqual( StdSocket().recv(4), '' )
+        self.assertEqual( StdSocket().recv(4), b'' )
 
     def test_recv_timeout(self):
         """
@@ -139,42 +140,38 @@ class ProcessStreamTest(unittest.TestCase):
         reads from stdout
         """
 
-        bytes = b'abcdefgh'
-        self.make_stream( 'echo {}'.format(bytes.decode('utf-8')) )
+        self.make_stream( 'echo {}'.format(DATA.decode('utf-8')) )
         result = self.stream.read(4)
-        self.assertEqual( result, bytes[:4] )
-        self.assertEqual( self.process.stdout.read(), bytes[4:] + b'\n' )
+        self.assertEqual( result, DATA[:4] )
+        self.assertEqual( self.process.stdout.read(), DATA[4:] + b'\n' )
 
     def test_read_more(self):
         """
         does not block when reading more than is available
         """
 
-        bytes = b'abcdefgh'
-        self.make_stream( 'echo {} && sleep infinity'.format(bytes.decode('utf-8')) )
+        self.make_stream( 'echo {} && sleep infinity'.format(DATA.decode('utf-8')) )
         result = self.stream.read(100)
-        self.assertEqual( result, bytes + b'\n' )
+        self.assertEqual( result, DATA + b'\n' )
 
     def test_read_stderr(self):
         """
         reads from stderr
         """
 
-        bytes = b'abcdefgh'
-        self.make_stream( 'echo {} >&2'.format(bytes.decode('utf-8')) )
+        self.make_stream( 'echo {} >&2'.format(DATA.decode('utf-8')) )
         result = self.stream.read_stderr(4)
-        self.assertEqual( result, bytes[:4] )
-        self.assertEqual( self.process.stderr.read(), bytes[4:] + b'\n' )
+        self.assertEqual( result, DATA[:4] )
+        self.assertEqual( self.process.stderr.read(), DATA[4:] + b'\n' )
 
     def test_read_stderr_more(self):
         """
         does not block when reading more than is available
         """
 
-        bytes = b'abcdefgh'
-        self.make_stream( 'echo {} >&2 && sleep infinity'.format(bytes.decode('utf-8')) )
+        self.make_stream( 'echo {} >&2 && sleep infinity'.format(DATA.decode('utf-8')) )
         result = self.stream.read_stderr(100)
-        self.assertEqual( result, bytes + b'\n' )
+        self.assertEqual( result, DATA + b'\n' )
 
     def test_stdout_ready(self):
         """
@@ -196,6 +193,28 @@ class ProcessStreamTest(unittest.TestCase):
         self.assertFalse( self.stream.stderr_ready(self.process.stdin) )
         self.assertFalse( self.stream.stderr_ready(self.process.stdout) )
 
+    def test_pipe_stdout(self):
+        """
+        pipes stdout to another stream
+        """
+
+        self.make_stream( 'echo {}'.format(DATA.decode('utf-8')) )
+        other = mock.Mock()
+        result = self.stream.pipe_stdout(self.stream.stdout, other, 4)
+        self.assertEqual( result, DATA[:4] )
+        other.write.assert_called_once_with(DATA[:4])
+
+    def test_pipe_stderr(self):
+        """
+        pipes stderr to another stream
+        """
+
+        self.make_stream( 'echo {} >&2'.format(DATA.decode('utf-8')) )
+        other = mock.Mock()
+        result = self.stream.pipe_stderr(self.stream.stderr, other, 4)
+        self.assertEqual( result, DATA[:4] )
+        other.write_stderr.assert_called_once_with(DATA[:4])
+
 class ChannelStreamTest(unittest.TestCase):
     """
     basic API test for ChannelStream
@@ -212,3 +231,5 @@ class ChannelStreamTest(unittest.TestCase):
         self.assertTrue( hasattr(stream, 'write_stderr') )
         self.assertTrue( hasattr(stream, 'stdout_ready') )
         self.assertTrue( hasattr(stream, 'stderr_ready') )
+        self.assertTrue( hasattr(stream, 'pipe_stdout') )
+        self.assertTrue( hasattr(stream, 'pipe_stderr') )
