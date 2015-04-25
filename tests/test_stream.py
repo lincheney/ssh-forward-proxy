@@ -9,6 +9,7 @@ sentinel = mock.sentinel
 import sys
 import os
 import socket
+import paramiko
 import subprocess
 PIPE = subprocess.PIPE
 
@@ -131,27 +132,27 @@ class ProcessStreamTest(unittest.TestCase):
         writes to stdin
         """
 
-        self.make_stream('tr l m').write(b'hello') # swap l with m
+        self.make_stream('tr l m').write(0, b'hello') # swap l with m
         self.process.stdin.close()
         self.assertEqual( self.process.stdout.read(), b'hemmo' )
 
-    def test_read(self):
+    def test_read_stdout(self):
         """
         reads from stdout
         """
 
         self.make_stream( 'echo {}'.format(DATA.decode('utf-8')) )
-        result = self.stream.read(4)
+        result = self.stream.read(self.stream.STDOUT, 4)
         self.assertEqual( result, DATA[:4] )
         self.assertEqual( self.process.stdout.read(), DATA[4:] + b'\n' )
 
-    def test_read_more(self):
+    def test_read_more_stdout(self):
         """
         does not block when reading more than is available
         """
 
         self.make_stream( 'echo {} && sleep infinity'.format(DATA.decode('utf-8')) )
-        result = self.stream.read(100)
+        result = self.stream.read(self.stream.STDOUT, 100)
         self.assertEqual( result, DATA + b'\n' )
 
     def test_read_stderr(self):
@@ -160,17 +161,17 @@ class ProcessStreamTest(unittest.TestCase):
         """
 
         self.make_stream( 'echo {} >&2'.format(DATA.decode('utf-8')) )
-        result = self.stream.read_stderr(4)
+        result = self.stream.read(self.stream.STDERR, 4)
         self.assertEqual( result, DATA[:4] )
         self.assertEqual( self.process.stderr.read(), DATA[4:] + b'\n' )
 
-    def test_read_stderr_more(self):
+    def test_read_more_stderr(self):
         """
         does not block when reading more than is available
         """
 
         self.make_stream( 'echo {} >&2 && sleep infinity'.format(DATA.decode('utf-8')) )
-        result = self.stream.read_stderr(100)
+        result = self.stream.read(self.stream.STDERR, 100)
         self.assertEqual( result, DATA + b'\n' )
 
     def test_stdout_ready(self):
@@ -179,9 +180,9 @@ class ProcessStreamTest(unittest.TestCase):
         """
 
         self.make_stream('true')
-        self.assertTrue( self.stream.stdout_ready(self.process.stdout) )
-        self.assertFalse( self.stream.stdout_ready(self.process.stdin) )
-        self.assertFalse( self.stream.stdout_ready(self.process.stderr) )
+        self.assertTrue( self.stream.ready(self.stream.STDOUT, self.process.stdout) )
+        self.assertFalse( self.stream.ready(self.stream.STDOUT, self.process.stdin) )
+        self.assertFalse( self.stream.ready(self.stream.STDOUT, self.process.stderr) )
 
     def test_stderr_ready(self):
         """
@@ -189,9 +190,9 @@ class ProcessStreamTest(unittest.TestCase):
         """
 
         self.make_stream('true')
-        self.assertTrue( self.stream.stderr_ready(self.process.stderr) )
-        self.assertFalse( self.stream.stderr_ready(self.process.stdin) )
-        self.assertFalse( self.stream.stderr_ready(self.process.stdout) )
+        self.assertTrue( self.stream.ready(self.stream.STDERR, self.process.stderr) )
+        self.assertFalse( self.stream.ready(self.stream.STDERR, self.process.stdin) )
+        self.assertFalse( self.stream.ready(self.stream.STDERR, self.process.stdout) )
 
     def test_pipe_stdout(self):
         """
@@ -200,9 +201,9 @@ class ProcessStreamTest(unittest.TestCase):
 
         self.make_stream( 'echo {}'.format(DATA.decode('utf-8')) )
         other = mock.Mock()
-        result = self.stream.pipe_stdout(self.stream.stdout, other, 4)
+        result = self.stream.pipe(self.stream.STDOUT, self.stream.stdout, other, 4)
         self.assertEqual( result, DATA[:4] )
-        other.write.assert_called_once_with(DATA[:4])
+        other.write.assert_called_once_with(self.stream.STDOUT, DATA[:4])
 
     def test_pipe_stderr(self):
         """
@@ -211,25 +212,39 @@ class ProcessStreamTest(unittest.TestCase):
 
         self.make_stream( 'echo {} >&2'.format(DATA.decode('utf-8')) )
         other = mock.Mock()
-        result = self.stream.pipe_stderr(self.stream.stderr, other, 4)
+        result = self.stream.pipe(self.stream.STDERR, self.stream.stderr, other, 4)
         self.assertEqual( result, DATA[:4] )
-        other.write_stderr.assert_called_once_with(DATA[:4])
+        other.write.assert_called_once_with(self.stream.STDERR, DATA[:4])
 
 class ChannelStreamTest(unittest.TestCase):
     """
     basic API test for ChannelStream
     """
 
-    def test_api(self):
-        channel = mock.Mock()
-        stream = ChannelStream(channel)
+    def make_channel(self):
+        self.channel = mock.Mock(spec=paramiko.Channel)
+        return self.channel
 
-        self.assertEqual( stream.streams, [channel] )
+    def test_api(self):
+        stream = ChannelStream(self.make_channel())
+
+        self.assertEqual( stream.streams, [self.channel] )
         self.assertTrue( hasattr(stream, 'read') )
-        self.assertTrue( hasattr(stream, 'read_stderr') )
         self.assertTrue( hasattr(stream, 'write') )
-        self.assertTrue( hasattr(stream, 'write_stderr') )
-        self.assertTrue( hasattr(stream, 'stdout_ready') )
-        self.assertTrue( hasattr(stream, 'stderr_ready') )
-        self.assertTrue( hasattr(stream, 'pipe_stdout') )
-        self.assertTrue( hasattr(stream, 'pipe_stderr') )
+        self.assertTrue( hasattr(stream, 'ready') )
+        self.assertTrue( hasattr(stream, 'pipe') )
+
+    def test_read(self):
+        stream = ChannelStream(self.make_channel())
+        self.assertEqual( stream.read(stream.STDOUT, 10), self.channel.recv(10) )
+        self.assertEqual( stream.read(stream.STDERR, 10), self.channel.recv_stderr(10) )
+
+    def test_write(self):
+        stream = ChannelStream(self.make_channel())
+        self.assertEqual( stream.write(stream.STDOUT, DATA), self.channel.sendall(DATA) )
+        self.assertEqual( stream.write(stream.STDERR, DATA), self.channel.sendall_stderr(DATA) )
+
+    def test_ready(self):
+        stream = ChannelStream(self.make_channel())
+        self.assertEqual( stream.ready(stream.STDOUT, sentinel.stream), self.channel.recv_ready() )
+        self.assertEqual( stream.ready(stream.STDERR, sentinel.stream), self.channel.recv_stderr_ready() )

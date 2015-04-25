@@ -50,17 +50,14 @@ class StdSocket:
         sys.stdout.close()
 
 class Stream:
-    def pipe_stdout(self, stream, other, size):
-        stdout = (self.stdout_ready(stream) and self.read(size))
-        if stdout:
-            other.write(stdout)
-        return stdout
+    STDOUT = 0
+    STDERR = 1
 
-    def pipe_stderr(self, stream, other, size):
-        stderr = (self.stderr_ready(stream) and self.read_stderr(size))
-        if stderr:
-            other.write_stderr(stderr)
-        return stderr
+    def pipe(self, key, stream, other, size):
+        output = (self.ready(key, stream) and self.read(key, size))
+        if output:
+            other.write(key, output)
+        return output
 
 class ProcessStream(Stream):
     def __init__(self, process):
@@ -70,39 +67,33 @@ class ProcessStream(Stream):
 
         self.streams = [self.stdout, self.stderr]
 
-    def write(self, string):
-        return ignore_broken_pipe(os.write, self.stdin.fileno(), string)
+    def read(self, key, n):
+        return os.read(self.streams[key].fileno(), n)
 
-    def read(self, n):
-        return os.read(self.stdout.fileno(), n)
+    def write(self, key, buf):
+        return ignore_broken_pipe(os.write, self.stdin.fileno(), buf)
 
-    def read_stderr(self, n):
-        return os.read(self.stderr.fileno(), n)
-
-    def stdout_ready(self, stream):
-        return stream is self.stdout
-
-    def stderr_ready(self, stream):
-        return stream is self.stderr
+    def ready(self, key, stream):
+        return stream is self.streams[key]
 
 
 class ChannelStream(Stream):
     def __init__(self, channel):
         self.channel = channel
-
         self.streams = [channel]
+        self.func_map = [
+            [self.channel.recv, self.channel.sendall, self.channel.recv_ready],
+            [self.channel.recv_stderr, self.channel.sendall_stderr, self.channel.recv_stderr_ready],
+        ]
 
-        self.read = self.channel.recv
-        self.read_stderr = self.channel.recv_stderr
+    def read(self, key, n):
+        return self.func_map[key][0](n)
 
-        self.write = self.channel.sendall
-        self.write_stderr = self.channel.sendall_stderr
+    def write(self, key, buf):
+        return self.func_map[key][1](buf)
 
-    def stdout_ready(self, stream):
-        return self.channel.recv_ready()
-
-    def stderr_ready(self, stream):
-        return self.channel.recv_stderr_ready()
+    def ready(self, key, stream):
+        return self.func_map[key][2]()
 
 
 def pipe_streams(input, output, size=1024):
@@ -112,14 +103,14 @@ def pipe_streams(input, output, size=1024):
 
         for stream in r:
             if stream in output.streams:
-                stdout = output.pipe_stdout(stream, input, size)
-                stderr = output.pipe_stderr(stream, input, size)
+                stdout = output.pipe(Stream.STDOUT, stream, input, size)
+                stderr = output.pipe(Stream.STDERR, stream, input, size)
                 if not (stdout or stderr):
                     logging.debug('Output streams closed')
                     done = True
 
             if stream in input.streams:
-                stdin = input.pipe_stdout(stream, output, size)
+                stdin = input.pipe(Stream.STDOUT, stream, output, size)
                 if not stdin:
                     logging.debug('Input streams closed')
                     done = True
