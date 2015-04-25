@@ -43,7 +43,7 @@ class BitBucketTest(unittest.TestCase):
     def setUp(self):
         if os.path.exists(self.REPO_DIR):
             shutil.rmtree(self.REPO_DIR)
-        self.env = os.environ.copy()
+        self.env = {}
 
     def test_repo_forbidden(self):
         """

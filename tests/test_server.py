@@ -32,9 +32,13 @@ class ServerScriptTest(unittest.TestCase):
 
         PORT = '4000'
         server = None
+
+        self.env = {}
+        self.env['PYTHONPATH'] = self.ROOT_DIR
+
         try:
             server_cmd = os.path.join(self.ROOT_DIR, 'bin', 'simple-ssh-server.py')
-            server = subprocess.Popen([sys.executable, server_cmd, PORT])
+            server = subprocess.Popen([sys.executable, server_cmd, PORT], env=self.env)
             # wait a second
             time.sleep(1)
             subprocess.check_call(['ssh', '-p', PORT, 'localhost', 'true'])
