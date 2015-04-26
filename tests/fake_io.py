@@ -19,8 +19,12 @@ def FakeInputChannel(file='stdin.txt', cmd=None):
 
     if cmd:
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        proc.close = lambda: (proc.poll() is None and proc.kill())
-        m.inputs = [proc]
+        def close():
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+        proc.close = close
+        m.inputs = [proc, proc.stdin, proc.stdout, proc.stderr]
         stdin = proc.stdout
     else:
         m.inputs = [open_file(file)]
