@@ -21,12 +21,11 @@ except ImportError:
     import Queue as queue
 
 import paramiko
-from ssh_forward_proxy import run_server, Server
+from ssh_forward_proxy import run_server, Server, ServerInterface
+
+ROOT_DIR = os.path.abspath(os.path.join(__file__, '..', '..'))
 
 class ServerScriptTest(unittest.TestCase):
-
-    ROOT_DIR = os.path.abspath(os.path.join(__file__, '..', '..'))
-
     def test_server(self):
         """
         test that we can SSH into server
@@ -36,10 +35,10 @@ class ServerScriptTest(unittest.TestCase):
         server = None
 
         self.env = {}
-        self.env['PYTHONPATH'] = self.ROOT_DIR
+        self.env['PYTHONPATH'] = ROOT_DIR
 
         try:
-            server_cmd = os.path.join(self.ROOT_DIR, 'bin', 'simple-ssh-server.py')
+            server_cmd = os.path.join(ROOT_DIR, 'bin', 'simple-ssh-server.py')
             server = subprocess.Popen([sys.executable, server_cmd, PORT], env=self.env)
             # wait a second
             time.sleep(1)
@@ -54,20 +53,64 @@ class PatchedServer(helper.TestCase):
     def setUp(self):
         super(PatchedServer, self).setUp()
         self.add_patch( patch.object(queue, 'Queue', return_value=queue.Queue()) )
-        self.add_patch( patch('paramiko.Transport') )
+        self.add_patch( patch('paramiko.Transport.start_server') )
+
 
         self.queue = queue.Queue()
 
-class ServerTest(PatchedServer):
-    def test_no_ssh_command(self):
+class TransportTest(PatchedServer):
+    SERVER = Server
+
+    def patch_get_command(self):
+        self.add_patch( patch.object(ServerInterface, 'get_command', return_value=(None, None)) )
+
+    @patch('paramiko.Transport')
+    def test_transport_opened_to_socket(self, transport):
+        """
+        proxy should open SSH transport to given socket
+        """
+
+        self.patch_get_command()
+        self.SERVER(sentinel.socket)
+        transport.assert_called_once_with(sentinel.socket)
+
+    @patch('paramiko.Transport')
+    def test_no_ssh_command(self, transport):
         """
         server should close transport and exit if no commands within the timeout
         """
 
         # reduce the timeout to 1 second
-        with patch.object(Server, 'timeout', new_callable=mock.PropertyMock(return_value=1)):
-            server = Server(sentinel.socket)
-            paramiko.Transport().close.assert_called_with()
+        with patch.object(ServerInterface, 'timeout', new_callable=mock.PropertyMock(return_value=1)):
+            server = self.SERVER(sentinel.socket)
+            server.transport.close.assert_called_with()
+
+    def test_default_host_key(self):
+        """
+        server should load the default key provided in the package
+        """
+
+        self.patch_get_command()
+        server = self.SERVER(sentinel.socket)
+        server.transport.host_key_type = 'ssh-rsa'
+
+        server_key = server.transport.get_server_key()
+        expected_key = paramiko.RSAKey(filename=os.path.join(self.ROOT_DIR, 'tests', 'default-server-key'))
+        self.assertEqual( server_key, expected_key )
+
+    def test_host_key(self):
+        """
+        server should load the default key provided in the package
+        """
+
+        self.patch_get_command()
+        key_path = os.path.join(self.ROOT_DIR, 'tests', 'test-server-key')
+        server = self.SERVER(sentinel.socket, server_key=key_path)
+        server.transport.host_key_type = 'ssh-rsa'
+
+        server_key = server.transport.get_server_key()
+        expected_key = paramiko.RSAKey(filename=key_path)
+        self.assertEqual( server_key, expected_key )
 
 class ServerIOTest(PatchedServer):
 
@@ -117,6 +160,8 @@ class ServerIOTest(PatchedServer):
         self.assertEqual(result, expected)
 
 class ServerProcessTest(PatchedServer):
+
+    client = None
 
     def tearDown(self):
         super(ServerProcessTest, self).tearDown()

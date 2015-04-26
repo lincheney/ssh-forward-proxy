@@ -7,7 +7,7 @@ patch = mock.patch
 sentinel = mock.sentinel
 
 from . import fake_io, helper
-from .test_server import PatchedServer
+from .test_server import PatchedServer, TransportTest
 
 import os
 import sys
@@ -27,18 +27,6 @@ class SimpleProxyTestCase(helper.TestCase):
     def setUp(self):
         super(SimpleProxyTestCase, self).setUp()
         self.add_patch( patch.object(Proxy, '__init__', return_value=None) )
-
-class TransportTest(unittest.TestCase):
-    @patch('ssh_forward_proxy.StdSocket', return_value=sentinel.std_socket)
-    @patch('paramiko.Transport.start_server')
-    def test_std_socket_used(self, transport, std_socket):
-        """
-        proxy should connect SSH to stdin, stdout, stderr
-        """
-
-        with patch.object(Proxy, 'get_command', return_value=(None, None)):
-            proxy = Proxy('host', 1234)
-            self.assertIs(proxy.transport.sock, sentinel.std_socket)
 
 class UsernameTest(SimpleProxyTestCase):
     """
@@ -95,43 +83,22 @@ class RemoteConnectionTest(unittest.TestCase):
         result = Proxy.connect_to_remote('abcdef', 12345, 'user')
         self.assertIs(result, client.return_value)
 
-class TransportTest(unittest.TestCase):
+class TransportTest(TransportTest):
     """
     tests for the paramiko.Transport
     """
 
-    @patch.object(Proxy, 'get_command', return_value=(None, None))
-    @patch('paramiko.Transport')
-    def test_transport_opened_to_std_streams(self, transport, get_command):
+    SERVER = Proxy
+
+    def test_transport_opened_to_std_streams(self):
         """
         proxy should open SSH transport to stdin, stdout and stderrr
         """
 
+        self.patch_get_command()
         with patch('ssh_forward_proxy.StdSocket') as sock:
-            Proxy()
-            transport.assert_called_once_with(sock())
-
-    @patch.object(Proxy, 'get_command', return_value=(None, None))
-    @patch('paramiko.Transport')
-    def test_transport_opened_to_socket(self, transport, get_command):
-        """
-        proxy should open SSH transport to given socket
-        """
-
-        Proxy(sentinel.socket)
-        transport.assert_called_once_with(sentinel.socket)
-
-    @patch('paramiko.Transport')
-    def test_no_ssh_command(self, transport):
-        """
-        server should close transport and exit if no commands within the timeout
-        """
-
-        # reduce the timeout to 1 second
-        with patch.object(Proxy, 'timeout', new_callable=mock.PropertyMock(return_value=1)):
-            server = Proxy(sentinel.socket)
-            transport().close.assert_called_with()
-
+            proxy = self.SERVER()
+            self.assertIs(proxy.transport.sock, sock())
 
 
 class IOTest(PatchedServer):

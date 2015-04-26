@@ -6,7 +6,7 @@ except ImportError:
 patch = mock.patch
 sentinel = mock.sentinel
 
-from .test_proxy import IOTest, SimpleProxyTestCase
+from .test_proxy import IOTest, SimpleProxyTestCase, TransportTest
 
 import os
 import shlex
@@ -52,6 +52,23 @@ class RemoteConnectionTest(SimpleProxyTestCase):
                 username=user,
                 key='value',
             )
+
+class TransportTest(TransportTest):
+    """
+    tests for the paramiko.Transport
+    """
+
+    SERVER = ProxyServer
+
+    def test_transport_opened_to_std_streams(self):
+        """
+        proxy should open SSH transport to stdin, stdout and stderrr
+        """
+
+        self.patch_get_command()
+        with patch('ssh_forward_proxy.StdSocket') as sock:
+            proxy = self.SERVER()
+            self.assertIs(proxy.transport.sock, sock())
 
 class IOTest(IOTest):
     """

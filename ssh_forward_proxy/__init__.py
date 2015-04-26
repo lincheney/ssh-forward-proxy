@@ -1,9 +1,12 @@
 import sys
 import socket
-import paramiko
 import threading
 import subprocess
 import errno
+from pkg_resources import resource_string
+import io
+
+import paramiko
 
 try:
     import queue
@@ -17,14 +20,19 @@ from .stream import *
 
 class ServerInterface(paramiko.ServerInterface):
     timeout = 10
-    host_key = paramiko.RSAKey(filename='server-key')
 
-    def __init__(self, socket):
+    def __init__(self, socket, server_key=None):
         paramiko.ServerInterface.__init__(self)
         self.queue = queue.Queue()
 
+        if server_key is None:
+            server_key = resource_string(__name__, 'server-key').decode('ascii')
+            server_key = paramiko.RSAKey(file_obj=io.StringIO(server_key))
+        else:
+            server_key = paramiko.RSAKey(filename=server_key)
+
         self.transport = paramiko.Transport(socket)
-        self.transport.add_server_key(self.host_key)
+        self.transport.add_server_key(server_key)
         self.transport.start_server(server=self)
 
     def get_command(self):
@@ -48,9 +56,9 @@ class ServerInterface(paramiko.ServerInterface):
         return True
 
 class Proxy(ServerInterface):
-    def __init__(self, socket=None, username=None, **kwargs):
+    def __init__(self, socket=None, username=None, server_key=None, **kwargs):
         self.username = username
-        ServerInterface.__init__(self, socket or StdSocket())
+        ServerInterface.__init__(self, socket or StdSocket(), server_key=server_key)
 
         client, command = self.get_command()
         if client:
@@ -108,8 +116,8 @@ class ProxyServer(Proxy):
         return super(ProxyServer, self).relay_to_remote(*args, **kwargs)
 
 class Server(ServerInterface):
-    def __init__(self, socket):
-        ServerInterface.__init__(self, socket)
+    def __init__(self, socket, **kwargs):
+        ServerInterface.__init__(self, socket, **kwargs)
 
         client, command = self.get_command()
         if not client:
