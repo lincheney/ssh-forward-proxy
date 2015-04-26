@@ -24,7 +24,6 @@ except ImportError:
     from pipes import quote as shell_quote
 
 PYTHON = shell_quote(sys.executable) # make sure to run with same python
-SSH_OPTIONS = '-o StrictHostKeyChecking=no -o PubkeyAuthentication=no'
 
 class BitBucketTest(unittest.TestCase):
 
